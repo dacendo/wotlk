@@ -1,4 +1,4 @@
-import { Race, RaidBuffs } from '../core/proto/common.js';
+import { Item, Race, RaidBuffs, WeaponType } from '../core/proto/common.js';
 import { PartyBuffs } from '../core/proto/common.js';
 import { IndividualBuffs } from '../core/proto/common.js';
 import { Debuffs } from '../core/proto/common.js';
@@ -16,7 +16,14 @@ import { Sim } from '../core/sim.js';
 import { IndividualSimUI } from '../core/individual_sim_ui.js';
 import { EventID, TypedEvent } from '../core/typed_event.js';
 
-import { Rogue, Rogue_Rotation as RogueRotation, Rogue_Options as RogueOptions, Rogue_Rotation_Frequency } from '../core/proto/rogue.js';
+import { 
+	Rogue_Rotation_AssassinationPriority as AssassinationPriority,
+	Rogue_Rotation_CombatPriority as CombatPriority,
+	Rogue, 
+	Rogue_Rotation as RogueRotation, 
+	Rogue_Options as RogueOptions, 
+	Rogue_Rotation_Frequency as Frequency,
+} from '../core/proto/rogue.js';
 
 import * as IconInputs from '../core/components/icon_inputs.js';
 import * as Mechanics from '../core/constants/mechanics.js';
@@ -33,14 +40,31 @@ export class RogueSimUI extends IndividualSimUI<Spec.SpecRogue> {
 			// List any known bugs / issues here and they'll be shown on the site.
 			knownIssues: [
 				'Rotations are not fully optimized, especially for non-standard setups.',
+				'Subtlety specs are not currently supported.'
 			],
 			warnings: [
 				(simUI: IndividualSimUI<Spec.SpecRogue>) => {
 					return {
 						updateOn: simUI.player.changeEmitter,
 						getContent: () => {
-							if (simUI.player.getRotation().exposeArmorFrequency != Rogue_Rotation_Frequency.Never && simUI.player.getTalents().improvedExposeArmor < 2) {
+							if (simUI.player.getRotation().exposeArmorFrequency != Frequency.Never && simUI.player.getTalents().improvedExposeArmor < 2) {
 								return '\'Maintain Expose Armor\' selected, but missing points in Improved Expose Armor!';
+							} else {
+								return '';
+							}
+						},
+					};
+				},
+				(simUI: IndividualSimUI<Spec.SpecRogue>) => {
+					return {
+						updateOn: simUI.player.changeEmitter,
+						getContent: () => {
+							if (
+								simUI.player.getTalents().mutilate &&
+								(simUI.player.getGear().getEquippedItem(ItemSlot.ItemSlotMainHand)?.item.weaponType != WeaponType.WeaponTypeDagger ||
+								simUI.player.getGear().getEquippedItem(ItemSlot.ItemSlotOffHand)?.item.weaponType != WeaponType.WeaponTypeDagger) 
+							){
+								return '\'Mutilate\' talent selected, but daggers not equipped in both hands!';
 							} else {
 								return '';
 							}
@@ -70,6 +94,7 @@ export class RogueSimUI extends IndividualSimUI<Spec.SpecRogue> {
 				Stat.StatStrength,
 				Stat.StatAttackPower,
 				Stat.StatMeleeHit,
+				Stat.StatSpellHit,
 				Stat.StatMeleeCrit,
 				Stat.StatMeleeHaste,
 				Stat.StatArmorPenetration,
@@ -147,7 +172,6 @@ export class RogueSimUI extends IndividualSimUI<Spec.SpecRogue> {
 			otherInputs: {
 				inputs: [
 					OtherInputs.StartingConjured,
-					OtherInputs.PrepopPotion,
 					OtherInputs.TankAssignment,
 					OtherInputs.InFrontOfTarget,
 				],
@@ -162,8 +186,8 @@ export class RogueSimUI extends IndividualSimUI<Spec.SpecRogue> {
 			presets: {
 				// Preset talents that the user can quickly select.
 				talents: [
-					Presets.CombatTalents,
 					Presets.AssassinationTalents,
+					Presets.CombatTalents,
 				],
 				// Preset gear configurations that the user can quickly select.
 				gear: [
@@ -171,6 +195,32 @@ export class RogueSimUI extends IndividualSimUI<Spec.SpecRogue> {
 					Presets.P1_PRESET,
 				],
 			},
+		})
+		this.player.changeEmitter.on((c) => {
+			const rotation = this.player.getRotation()
+			if (this.player.getTalents().mutilate) {
+				if (rotation.assassinationFinisherPriority == AssassinationPriority.AssassinationPriorityUnknown) {
+					rotation.assassinationFinisherPriority = Presets.DefaultRotation.assassinationFinisherPriority;
+				}
+				rotation.combatFinisherPriority = CombatPriority.CombatPriorityUnknown;
+			} else {
+				rotation.assassinationFinisherPriority = AssassinationPriority.AssassinationPriorityUnknown;
+				if (rotation.combatFinisherPriority == CombatPriority.CombatPriorityUnknown) {
+					rotation.combatFinisherPriority = Presets.DefaultRotation.combatFinisherPriority;
+				}
+			}
+			this.player.setRotation(c, rotation)
+		});
+		this.sim.encounter.changeEmitter.on((c) => {
+			const rotation = this.player.getRotation()
+			if (this.sim.encounter.getNumTargets() > 3) {
+				if (rotation.multiTargetSliceFrequency == Frequency.FrequencyUnknown) {
+					rotation.multiTargetSliceFrequency = Presets.DefaultRotation.multiTargetSliceFrequency;
+				}
+			} else {
+				rotation.multiTargetSliceFrequency = Frequency.FrequencyUnknown;
+			}
+			this.player.setRotation(c, rotation)
 		});
 	}
 }

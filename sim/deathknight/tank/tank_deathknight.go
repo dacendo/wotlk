@@ -14,9 +14,9 @@ func RegisterTankDeathknight() {
 			return NewTankDeathknight(character, options)
 		},
 		func(player *proto.Player, spec interface{}) {
-			playerSpec, ok := spec.(*proto.Player_Deathknight)
+			playerSpec, ok := spec.(*proto.Player_TankDeathknight)
 			if !ok {
-				panic("Invalid spec value for Deathknight!")
+				panic("Invalid spec value for Tank Deathknight!")
 			}
 			player.Spec = playerSpec
 		},
@@ -44,6 +44,19 @@ func NewTankDeathknight(character core.Character, options proto.Player) *TankDea
 		Options:  *dkOptions.Options,
 	}
 
+	tankDk.EnableAutoAttacks(tankDk, core.AutoAttackOptions{
+		MainHand:       tankDk.WeaponFromMainHand(tankDk.DefaultMeleeCritMultiplier()),
+		OffHand:        tankDk.WeaponFromOffHand(tankDk.DefaultMeleeCritMultiplier()),
+		AutoSwingMelee: true,
+		ReplaceMHSwing: func(sim *core.Simulation, mhSwingSpell *core.Spell) *core.Spell {
+			if tankDk.RuneStrike.CanCast(sim) {
+				return tankDk.RuneStrike.Spell
+			} else {
+				return nil
+			}
+		},
+	})
+
 	return tankDk
 }
 
@@ -56,10 +69,9 @@ func (dk *TankDeathknight) Initialize() {
 }
 
 func (dk *TankDeathknight) SetupRotations() {
-	dk.Opener.Clear()
-	dk.Main.Clear()
+	dk.RotationSequence.Clear()
 
-	dk.setupBloodTankERWOpener()
+	dk.setupBloodTankERWThreatOpener()
 }
 
 func (dk *TankDeathknight) Reset(sim *core.Simulation) {

@@ -1,6 +1,8 @@
 package smite
 
 import (
+	"time"
+
 	"github.com/wowsims/wotlk/sim/core"
 	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/priest"
@@ -27,6 +29,7 @@ func NewSmitePriest(character core.Character, options proto.Player) *SmitePriest
 	smiteOptions := options.GetSmitePriest()
 
 	selfBuffs := priest.SelfBuffs{
+		UseInnerFire:   smiteOptions.Options.UseInnerFire,
 		UseShadowfiend: smiteOptions.Options.UseShadowfiend,
 	}
 
@@ -41,6 +44,8 @@ func NewSmitePriest(character core.Character, options proto.Player) *SmitePriest
 	spriest := &SmitePriest{
 		Priest:   basePriest,
 		rotation: *smiteOptions.Rotation,
+
+		allowedHFDelay: time.Millisecond * time.Duration(smiteOptions.Rotation.AllowedHolyFireDelayMs),
 	}
 
 	spriest.EnableResumeAfterManaWait(spriest.tryUseGCD)
@@ -52,10 +57,21 @@ type SmitePriest struct {
 	*priest.Priest
 
 	rotation proto.SmitePriest_Rotation
+
+	allowedHFDelay time.Duration
 }
 
 func (spriest *SmitePriest) GetPriest() *priest.Priest {
 	return spriest.Priest
+}
+
+func (spriest *SmitePriest) Initialize() {
+	spriest.Priest.Initialize()
+
+	spriest.RegisterHolyFireSpell(spriest.rotation.MemeDream)
+	spriest.RegisterSmiteSpell(spriest.rotation.MemeDream)
+	spriest.RegisterPenanceSpell()
+	spriest.RegisterHymnOfHopeCD()
 }
 
 func (spriest *SmitePriest) Reset(sim *core.Simulation) {

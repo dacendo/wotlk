@@ -105,6 +105,10 @@ var Enchants = []Enchant{
 	{ID: 54999, EffectID: 3604, Name: "Hyperspeed Accelerators", IsSpellID: true, Quality: proto.ItemQuality_ItemQualityCommon, Bonus: stats.Stats{}, ItemType: proto.ItemType_ItemTypeHands, RequiredProfession: proto.Profession_Engineering},
 	{ID: 63770, EffectID: 3860, Name: "Reticulated Armor Webbing", IsSpellID: true, Quality: proto.ItemQuality_ItemQualityCommon, Bonus: stats.Stats{stats.Armor: 885}, ItemType: proto.ItemType_ItemTypeHands, RequiredProfession: proto.Profession_Engineering},
 
+	// Waist
+	{ID: 54736, EffectID: 3599, Name: "Personal Electromagnetic Pulse Generator", IsSpellID: true, Quality: proto.ItemQuality_ItemQualityCommon, Bonus: stats.Stats{}, ItemType: proto.ItemType_ItemTypeWaist, RequiredProfession: proto.Profession_Engineering},
+	{ID: 54793, EffectID: 3601, Name: "Frag Belt", IsSpellID: true, Quality: proto.ItemQuality_ItemQualityCommon, Bonus: stats.Stats{}, ItemType: proto.ItemType_ItemTypeWaist, RequiredProfession: proto.Profession_Engineering},
+
 	// Legs
 	{ID: 38371, EffectID: 3325, Name: "Jormungar Leg Armor", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{stats.Stamina: 45, stats.Agility: 15}, ItemType: proto.ItemType_ItemTypeLegs},
 	{ID: 38372, EffectID: 3326, Name: "Nerubian Leg Armor", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{stats.AttackPower: 55, stats.RangedAttackPower: 55, stats.MeleeCrit: 15, stats.SpellCrit: 15}, ItemType: proto.ItemType_ItemTypeLegs},
@@ -155,7 +159,7 @@ var Enchants = []Enchant{
 
 	// 2H Weapon
 	{ID: 44473, EffectID: 3247, Name: "Scourgebane", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{}, ItemType: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeTwoHand},
-	{ID: 44483, EffectID: 3827, Name: "Massacre", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{stats.AttackPower: 110, stats.RangedAttackPower: 110}, ItemType: proto.ItemType_ItemTypeWeapon},
+	{ID: 44483, EffectID: 3827, Name: "Massacre", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{stats.AttackPower: 110, stats.RangedAttackPower: 110}, ItemType: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeTwoHand},
 	{ID: 44630, EffectID: 3828, Name: "Greater Savagery", IsSpellID: true, Quality: proto.ItemQuality_ItemQualityCommon, Bonus: stats.Stats{stats.AttackPower: 85, stats.RangedAttackPower: 85}, ItemType: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeTwoHand},
 	{ID: 45059, EffectID: 3854, Name: "Greater Spellpower", Quality: proto.ItemQuality_ItemQualityRare, Bonus: stats.Stats{stats.SpellPower: 81, stats.HealingPower: 81}, ItemType: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeTwoHand},
 	{ID: 53342, EffectID: 3367, Name: "Rune of Spellshattering", IsSpellID: true, Phase: 1, Quality: proto.ItemQuality_ItemQualityUncommon, Bonus: stats.Stats{}, ItemType: proto.ItemType_ItemTypeWeapon, ClassAllowlist: []proto.Class{proto.Class_ClassDeathknight}},

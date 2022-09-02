@@ -99,29 +99,16 @@ export class EnhancementShamanSimUI extends IndividualSimUI<Spec.SpecEnhancement
 				// Default spec-specific settings.
 				specOptions: Presets.DefaultOptions,
 				// Default raid/party buffs settings.
-				raidBuffs: RaidBuffs.create({
-					arcaneBrilliance: true,
-					divineSpirit: true,
-					giftOfTheWild: TristateEffect.TristateEffectImproved,
-					battleShout: TristateEffect.TristateEffectImproved,
-					leaderOfThePack: TristateEffect.TristateEffectImproved,
-				}),
+				raidBuffs: Presets.DefaultRaidBuffs,
 				partyBuffs: PartyBuffs.create({
 				}),
 				individualBuffs: IndividualBuffs.create({
 					blessingOfKings: true,
 					blessingOfWisdom: TristateEffect.TristateEffectImproved,
 					blessingOfMight: TristateEffect.TristateEffectImproved,
+					judgementsOfTheWise: true,
 				}),
-				debuffs: Debuffs.create({
-					bloodFrenzy: true,
-					sunderArmor: true,
-					curseOfWeakness: TristateEffect.TristateEffectRegular,
-					curseOfElements: true,
-					faerieFire: TristateEffect.TristateEffectImproved,
-					judgementOfWisdom: true,
-					misery: true,
-				}),
+				debuffs: Presets.DefaultDebuffs,
 			},
 
 			// IconInputs to include in the 'Player' section on the settings tab.
@@ -135,14 +122,18 @@ export class EnhancementShamanSimUI extends IndividualSimUI<Spec.SpecEnhancement
 			rotationInputs: ShamanInputs.EnhancementShamanRotationConfig, 
 			// Buff and Debuff inputs to include/exclude, overriding the EP-based defaults.
 			includeBuffDebuffInputs: [
+				IconInputs.ReplenishmentBuff,
+				IconInputs.MP5Buff,
+				IconInputs.SpellHasteBuff,
+				IconInputs.SpiritBuff,
 			],
 			excludeBuffDebuffInputs: [
+				IconInputs.BleedDebuff,
 			],
 			// Inputs to include in the 'Other' section on the settings tab.
 			otherInputs: {
 				inputs: [
 					ShamanInputs.SyncTypeInput,
-					OtherInputs.PrepopPotion,
 					OtherInputs.TankAssignment,
 					OtherInputs.InFrontOfTarget,
 				],

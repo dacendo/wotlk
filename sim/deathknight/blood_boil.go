@@ -31,7 +31,7 @@ func (dk *Deathknight) registerBloodBoilSpell() {
 		ApplyEffects: dk.withRuneRefund(rs, core.SpellEffect{
 			ProcMask:             core.ProcMaskSpellDamage,
 			BonusSpellCritRating: 0.0,
-			DamageMultiplier:     1.0,
+			DamageMultiplier:     dk.bloodyStrikesBonus(dk.BloodBoil),
 			ThreatMultiplier:     1.0,
 			BaseDamage: core.BaseDamageConfig{
 				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
@@ -47,17 +47,7 @@ func (dk *Deathknight) registerBloodBoilSpell() {
 				}
 			},
 		}, true),
-	})
-}
-
-// TODO: REDO THIS SO WE DONT USE CanSpell
-func (dk *Deathknight) CanBloodBoil(sim *core.Simulation) bool {
-	return dk.CastCostPossible(sim, 0.0, 1, 0, 0) && dk.BloodStrike.IsReady(sim)
-}
-
-func (dk *Deathknight) CastBloodBoil(sim *core.Simulation, target *core.Unit) bool {
-	if dk.CanBloodBoil(sim) {
-		return dk.BloodBoil.Cast(sim, target)
-	}
-	return false
+	}, func(sim *core.Simulation) bool {
+		return dk.CastCostPossible(sim, 0.0, 1, 0, 0) && dk.BloodBoil.IsReady(sim)
+	}, nil)
 }

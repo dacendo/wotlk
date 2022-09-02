@@ -86,11 +86,11 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 				// Default consumes settings.
 				consumes: Presets.DefaultConsumes,
 				// Default rotation settings.
-				rotation: Presets.DefaultRotation,
+				rotation: Presets.DefaultFrostRotation,
 				// Default talents.
 				talents: Presets.FrostTalents.data,
 				// Default spec-specific settings.
-				specOptions: Presets.DefaultOptions,
+				specOptions: Presets.DefaultFrostOptions,
 				// Default raid/party buffs settings.
 				raidBuffs: RaidBuffs.create({
 					giftOfTheWild: TristateEffect.TristateEffectImproved,
@@ -105,6 +105,7 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 					stoneskinTotem: TristateEffect.TristateEffectImproved,
 					moonkinAura: TristateEffect.TristateEffectRegular,
 					wrathOfAirTotem: true,
+					powerWordFortitude: TristateEffect.TristateEffectImproved, 
 				}),
 				partyBuffs: PartyBuffs.create({
 					heroicPresence: false,
@@ -135,9 +136,9 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 			// Buff and Debuff inputs to include/exclude, overriding the EP-based defaults.
 			includeBuffDebuffInputs: [
 				IconInputs.SpellDamageDebuff,
+				IconInputs.StaminaBuff,
 			],
 			excludeBuffDebuffInputs: [
-				IconInputs.StaminaBuff,
 				IconInputs.AttackPowerDebuff,
 				IconInputs.DamageReductionPercentBuff,
 				IconInputs.MeleeAttackSpeedDebuff,
@@ -151,8 +152,6 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 					DeathKnightInputs.PrecastGhoulFrenzy,
 					DeathKnightInputs.PrecastHornOfWinter,
 					
-					OtherInputs.PrepopPotion,
-
 					OtherInputs.TankAssignment,
 					OtherInputs.InFrontOfTarget,
 				],
@@ -169,6 +168,7 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 					Presets.FrostUnholyTalents,
 					Presets.UnholyDualWieldTalents,
 					Presets.Unholy2HTalents,
+					Presets.BloodTalents,
 				],
 				// Preset gear configurations that the user can quickly select.
 				gear: [
@@ -179,6 +179,7 @@ export class DeathknightSimUI extends IndividualSimUI<Spec.SpecDeathknight> {
 					Presets.P1_UNHOLY_DW_BIS_PRESET,
 					Presets.P1_UNHOLY_2H_PRERAID_PRESET,
 					Presets.P1_UNHOLY_2H_BIS_PRESET,
+					Presets.P1_BLOOD_BIS_PRESET,
 				],
 			},
 		});

@@ -1,4 +1,4 @@
-import { Consumes, PetFood } from '../core/proto/common.js';
+import { Consumes, Explosive, PetFood } from '../core/proto/common.js';
 import { EquipmentSpec } from '../core/proto/common.js';
 import { Flask } from '../core/proto/common.js';
 import { Food } from '../core/proto/common.js';
@@ -16,6 +16,7 @@ import {
 } from '../core/proto/deathknight.js';
 
 import * as Tooltips from '../core/constants/tooltips.js';
+import { Deathknight_Rotation_StartingPresence, Deathknight_Rotation_BloodRuneFiller } from '../core/proto/deathknight.js';
 
 // Preset options for this spec.
 // Eventually we will import these values for the raid sim too, so its good to
@@ -83,27 +84,68 @@ export const Unholy2HTalents = {
 	}),
 };
 
+export const BloodTalents = {
+	name: 'Blood DPS',
+	data: SavedTalents.create({
+		talentsString: '2305020530003303231023101351--230220305003',
+		glyphs: Glyphs.create({
+			major1: DeathknightMajorGlyph.GlyphOfDancingRuneWeapon,
+			major2: DeathknightMajorGlyph.GlyphOfDeathStrike,
+			major3: DeathknightMajorGlyph.GlyphOfDisease,
+			minor1: DeathknightMinorGlyph.GlyphOfHornOfWinter,
+			minor2: DeathknightMinorGlyph.GlyphOfPestilence,
+			minor3: DeathknightMinorGlyph.GlyphOfRaiseDead,
+		}),
+	}),
+};
 
-export const DefaultRotation = DeathKnightRotation.create({
+export const DefaultUnholyRotation = DeathKnightRotation.create({
   useDeathAndDecay: true,
-  btGhoulFrenzy: true,
+  btGhoulFrenzy: false,
 	refreshHornOfWinter: false,
   useEmpowerRuneWeapon: true,
+  startingPresence: Deathknight_Rotation_StartingPresence.Unholy,
+  bloodRuneFiller: Deathknight_Rotation_BloodRuneFiller.BloodBoil,
+  useAms: false,
 });
 
-export const DefaultOptions = DeathKnightOptions.create({
+export const DefaultUnholyOptions = DeathKnightOptions.create({
 	startingRunicPower: 0,
 	petUptime: 1,
 	precastGhoulFrenzy: true,
   precastHornOfWinter: true,
 });
 
+export const DefaultFrostRotation = DeathKnightRotation.create({
+  useDeathAndDecay: false,
+  btGhoulFrenzy: false,
+	refreshHornOfWinter: false,
+  useEmpowerRuneWeapon: true,
+  startingPresence: Deathknight_Rotation_StartingPresence.Blood,
+  bloodRuneFiller: Deathknight_Rotation_BloodRuneFiller.BloodBoil,
+  useAms: false,
+  avgAmsSuccessRate: 1.0,
+  avgAmsHit: 10000.0,
+  oblitDelayDuration: 0,
+});
+
+export const DefaultFrostOptions = DeathKnightOptions.create({
+	startingRunicPower: 0,
+	petUptime: 1,
+  precastHornOfWinter: true,
+});
+
+export const OtherDefaults = {
+};
+
 export const DefaultConsumes = Consumes.create({
-	flask: Flask.FlaskOfEndlessRage,
-	food: Food.FoodDragonfinFilet,
-	defaultPotion: Potions.PotionOfSpeed,
-	petFood: PetFood.PetFoodSpicedMammothTreats,
-	prepopPotion:  Potions.PotionOfSpeed,
+  flask: Flask.FlaskOfEndlessRage,
+  food: Food.FoodDragonfinFilet,
+  defaultPotion: Potions.PotionOfSpeed,
+  petFood: PetFood.PetFoodSpicedMammothTreats,
+  prepopPotion:  Potions.PotionOfSpeed,
+  thermalSapper: true,
+  fillerExplosive: Explosive.ExplosiveSaroniteBomb,
 });
 
 export const P1_UNHOLY_2H_PRERAID_PRESET = {
@@ -407,7 +449,7 @@ export const P1_UNHOLY_DW_BIS_PRESET = {
       "enchant": 44879,
       "gems": [
         41400,
-        49110
+        42702
       ]
     },
     {
@@ -460,8 +502,11 @@ export const P1_UNHOLY_DW_BIS_PRESET = {
       "enchant": 38374
     },
     {
-      "id": 40591,
-      "enchant": 55016
+      "id": 39706,
+      "enchant": 55016,
+      "gems": [
+        39996
+      ]
     },
     {
       "id": 40717
@@ -470,7 +515,7 @@ export const P1_UNHOLY_DW_BIS_PRESET = {
       "id": 40075
     },
     {
-      "id": 40684
+      "id": 37390
     },
     {
       "id": 42987
@@ -481,10 +526,10 @@ export const P1_UNHOLY_DW_BIS_PRESET = {
     },
     {
       "id": 40491,
-      "enchant": 53341
+      "enchant": 44495
     },
     {
-      "id": 40867
+      "id": 42620
     }
   ]}`),
 };
@@ -802,4 +847,99 @@ export const P1_FROST_GAME_BIS_PRESET = {
     "id": 50459
   }
 ]}`),
+};
+
+export const P1_BLOOD_BIS_PRESET = {
+	name: 'P1 BiS Blood',
+	toolbar: Tooltips.BASIC_BIS_DISCLAIMER,
+	enableWhen: (player: Player<Spec.SpecDeathknight>) => player.getTalents().dancingRuneWeapon,
+	gear: EquipmentSpec.fromJsonString(`{ "items": [
+    {
+          "id": 44006,
+          "enchant": 44879,
+          "gems": [
+            41400,
+            42702
+          ]
+        },
+        {
+          "id": 39421
+        },
+        {
+          "id": 40557,
+          "enchant": 44871,
+          "gems": [
+            39996
+          ]
+        },
+        {
+          "id": 40403,
+          "enchant": 44472
+        },
+        {
+          "id": 40550,
+          "enchant": 44489,
+          "gems": [
+            42142,
+            39996
+          ]
+        },
+        {
+          "id": 40330,
+          "enchant": 44484,
+          "gems": [
+            39996,
+            0
+          ]
+        },
+        {
+          "id": 40347,
+          "enchant": 54999,
+          "gems": [
+            39996,
+            0
+          ]
+        },
+        {
+          "id": 40278,
+          "gems": [
+            42142,
+            42142
+          ]
+        },
+        {
+          "id": 40294,
+          "enchant": 38374
+        },
+        {
+          "id": 39706,
+          "enchant": 55016,
+          "gems": [
+            39996
+          ]
+        },
+        {
+          "id": 40717
+        },
+        {
+          "id": 40075
+        },
+        {
+          "id": 37390
+        },
+        {
+          "id": 42987
+        },
+        {
+          "id": 40189,
+          "enchant": 53344
+        },
+        {
+          "id": 40491,
+          "enchant": 44495
+        },
+        {
+          "id": 42620
+        }
+  ]}`),
 };

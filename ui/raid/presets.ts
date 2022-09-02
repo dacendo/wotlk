@@ -22,6 +22,7 @@ import { Player } from '../core/player.js';
 
 import { BuffBot } from './buff_bot.js';
 
+import * as DeathknightPresets from '../deathknight/presets.js';
 import * as BalanceDruidPresets from '../balance_druid/presets.js';
 import * as FeralDruidPresets from '../feral_druid/presets.js';
 import * as FeralTankDruidPresets from '../feral_tank_druid/presets.js';
@@ -54,9 +55,11 @@ import { SmitePriestSimUI } from '../smite_priest/sim.js';
 import { WarriorSimUI } from '../warrior/sim.js';
 import { ProtectionWarriorSimUI } from '../protection_warrior/sim.js';
 import { WarlockSimUI } from '../warlock/sim.js';
+import { DeathknightSimUI } from '../deathknight/sim.js';
 
 export const specSimFactories: Partial<Record<Spec, (parentElem: HTMLElement, player: Player<any>) => IndividualSimUI<any>>> = {
-    [Spec.SpecBalanceDruid]: (parentElem: HTMLElement, player: Player<any>) => new BalanceDruidSimUI(parentElem, player),
+    [Spec.SpecDeathknight]: (parentElem: HTMLElement, player: Player<any>) => new DeathknightSimUI(parentElem, player),
+	[Spec.SpecBalanceDruid]: (parentElem: HTMLElement, player: Player<any>) => new BalanceDruidSimUI(parentElem, player),
     [Spec.SpecFeralDruid]: (parentElem: HTMLElement, player: Player<any>) => new FeralDruidSimUI(parentElem, player),
     [Spec.SpecFeralTankDruid]: (parentElem: HTMLElement, player: Player<any>) => new FeralTankDruidSimUI(parentElem, player),
     [Spec.SpecElementalShaman]: (parentElem: HTMLElement, player: Player<any>) => new ElementalShamanSimUI(parentElem, player),
@@ -111,6 +114,56 @@ export interface BuffBotSettings {
 
 export const playerPresets: Array<PresetSpecSettings<any>> = [
 	{
+		spec: Spec.SpecDeathknight,
+		rotation: DeathknightPresets.DefaultFrostRotation,
+		talents: DeathknightPresets.FrostTalents.data,
+		specOptions: DeathknightPresets.DefaultFrostOptions,
+		consumes: DeathknightPresets.DefaultConsumes,
+		defaultName: 'Frost DK',
+		defaultFactionRaces: {
+			[Faction.Unknown]: Race.RaceUnknown,
+			[Faction.Alliance]: Race.RaceHuman,
+			[Faction.Horde]: Race.RaceTroll,
+		},
+		defaultGear: {
+			[Faction.Unknown]: {},
+			[Faction.Alliance]: {
+				1: DeathknightPresets.P1_FROST_BIS_PRESET.gear,
+			},
+			[Faction.Horde]: {
+				1: DeathknightPresets.P1_FROST_BIS_PRESET.gear,
+			},
+		},
+		otherDefaults: DeathknightPresets.OtherDefaults,
+		tooltip: 'Frost Death Knight',
+		iconUrl: talentTreeIcons[Class.ClassDeathknight][1],
+	},
+	{
+		spec: Spec.SpecDeathknight,
+		rotation: DeathknightPresets.DefaultUnholyRotation,
+		talents: DeathknightPresets.UnholyDualWieldTalents.data,
+		specOptions: DeathknightPresets.DefaultUnholyOptions,
+		consumes: DeathknightPresets.DefaultConsumes,
+		defaultName: 'DW Unholy DK',
+		defaultFactionRaces: {
+			[Faction.Unknown]: Race.RaceUnknown,
+			[Faction.Alliance]: Race.RaceHuman,
+			[Faction.Horde]: Race.RaceTroll,
+		},
+		defaultGear: {
+			[Faction.Unknown]: {},
+			[Faction.Alliance]: {
+				1: DeathknightPresets.P1_UNHOLY_DW_BIS_PRESET.gear,
+			},
+			[Faction.Horde]: {
+				1: DeathknightPresets.P1_UNHOLY_DW_BIS_PRESET.gear,
+			},
+		},
+		otherDefaults: DeathknightPresets.OtherDefaults,
+		tooltip: 'Dual Wield Unholy DK',
+		iconUrl: talentTreeIcons[Class.ClassDeathknight][2],
+	},
+	{
 		spec: Spec.SpecBalanceDruid,
 		rotation: BalanceDruidPresets.DefaultRotation,
 		talents: BalanceDruidPresets.StandardTalents.data,
@@ -125,10 +178,10 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 		defaultGear: {
 			[Faction.Unknown]: {},
 			[Faction.Alliance]: {
-				5: BalanceDruidPresets.P5_PRESET.gear,
+				1: BalanceDruidPresets.P1_PRESET.gear,
 			},
 			[Faction.Horde]: {
-				5: BalanceDruidPresets.P5_PRESET.gear,
+				1: BalanceDruidPresets.P1_PRESET.gear,
 			},
 		},
 		tooltip: specNames[Spec.SpecBalanceDruid],
@@ -269,10 +322,10 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 		defaultGear: {
 			[Faction.Unknown]: {},
 			[Faction.Alliance]: {
-				0: MagePresets.P1_ARCANE_PRESET.gear,
+				1: MagePresets.P1_ARCANE_PRESET.gear,
 			},
 			[Faction.Horde]: {
-				0: MagePresets.P1_ARCANE_PRESET.gear,
+				1: MagePresets.P1_ARCANE_PRESET.gear,
 			},
 		},
 		tooltip: 'Arcane Mage',
@@ -293,10 +346,10 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 		defaultGear: {
 			[Faction.Unknown]: {},
 			[Faction.Alliance]: {
-				0: MagePresets.P1_FIRE_PRESET.gear,
+				1: MagePresets.P1_FIRE_PRESET.gear,
 			},
 			[Faction.Horde]: {
-				0: MagePresets.P1_FIRE_PRESET.gear,
+				1: MagePresets.P1_FIRE_PRESET.gear,
 			},
 		},
 		tooltip: 'Fire Mage',
@@ -317,10 +370,10 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 		defaultGear: {
 			[Faction.Unknown]: {},
 			[Faction.Alliance]: {
-				0: MagePresets.P1_FROST_PRESET.gear,
+				1: MagePresets.P1_FROST_PRESET.gear,
 			},
 			[Faction.Horde]: {
-				0: MagePresets.P1_FROST_PRESET.gear,
+				1: MagePresets.P1_FROST_PRESET.gear,
 			},
 		},
 		tooltip: 'Frost Mage',
@@ -497,7 +550,7 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 	{
 		spec: Spec.SpecProtectionWarrior,
 		rotation: ProtectionWarriorPresets.DefaultRotation,
-		talents: ProtectionWarriorPresets.ImpaleProtTalents.data,
+		talents: ProtectionWarriorPresets.StandardTalents.data,
 		specOptions: ProtectionWarriorPresets.DefaultOptions,
 		consumes: ProtectionWarriorPresets.DefaultConsumes,
 		defaultName: 'Prot Warrior',
@@ -574,105 +627,96 @@ export const playerPresets: Array<PresetSpecSettings<any>> = [
 		tooltip: 'Protection Paladin',
 		iconUrl: talentTreeIcons[Class.ClassPaladin][1],
 	},
-	/*	{
-			spec: Spec.SpecWarlock,
-			rotation: WarlockPresets.DefaultRotation,
-			talents: WarlockPresets.DestructionTalents.data,
-			specOptions: WarlockPresets.DefaultOptions,
-			consumes: WarlockPresets.DefaultConsumes,
-			defaultName: 'Destro Warlock',
-			defaultFactionRaces: {
-				[Faction.Unknown]: Race.RaceUnknown,
-				[Faction.Alliance]: Race.RaceHuman,
-				[Faction.Horde]: Race.RaceBloodElf,
+	{
+		spec: Spec.SpecWarlock,
+		rotation: WarlockPresets.DestructionRotation,
+		talents: WarlockPresets.DestructionTalents.data,
+		specOptions: WarlockPresets.DestructionOptions,
+		consumes: WarlockPresets.DefaultConsumes,
+		defaultName: 'Destro Warlock',
+		defaultFactionRaces: {
+			[Faction.Unknown]: Race.RaceUnknown,
+			[Faction.Alliance]: Race.RaceHuman,
+			[Faction.Horde]: Race.RaceOrc,
+		},
+		defaultGear: {
+			[Faction.Unknown]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
 			},
-			defaultGear: {
-				[Faction.Unknown]: {},
-				[Faction.Alliance]: {
-					1: WarlockPresets.P1_DESTRO.gear,
-					2: WarlockPresets.P2_DESTRO.gear,
-					3: WarlockPresets.P3_DESTRO.gear,
-					4: WarlockPresets.P4_DESTRO.gear,
-					5: WarlockPresets.P5_DESTRO.gear,
-				},
-				[Faction.Horde]: {
-					1: WarlockPresets.P1_DESTRO.gear,
-					2: WarlockPresets.P2_DESTRO.gear,
-					3: WarlockPresets.P3_DESTRO.gear,
-					4: WarlockPresets.P4_DESTRO.gear,
-					5: WarlockPresets.P5_DESTRO.gear,
-				},
+			[Faction.Alliance]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
 			},
-			otherDefaults: WarlockPresets.OtherDefaults,
-			tooltip: 'Destruction Warlock: defaults to casting Curse of Doom.',
-			iconUrl: talentTreeIcons[Class.ClassWarlock][2],
-		},*/
+			[Faction.Horde]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
+			},
+		},
+		otherDefaults: WarlockPresets.OtherDefaults,
+		tooltip: 'Destruction Warlock: Adds Improved Soul Leech and Blood Pact',
+		iconUrl: talentTreeIcons[Class.ClassWarlock][2],
+	},
 	{
 		spec: Spec.SpecWarlock,
 		rotation: WarlockPresets.AfflictionRotation,
 		talents: WarlockPresets.AfflictionTalents.data,
 		specOptions: WarlockPresets.AfflictionOptions,
 		consumes: WarlockPresets.DefaultConsumes,
-		defaultName: 'Aff Warlock',
+		defaultName: 'Affli Warlock',
 		defaultFactionRaces: {
 			[Faction.Unknown]: Race.RaceUnknown,
 			[Faction.Alliance]: Race.RaceHuman,
-			[Faction.Horde]: Race.RaceBloodElf,
+			[Faction.Horde]: Race.RaceOrc,
 		},
 		defaultGear: {
-			[Faction.Unknown]: {},
+			[Faction.Unknown]: {
+				1: WarlockPresets.P1_Preset_Affliction.gear,
+				2: WarlockPresets.P1_PreBiS_11.gear,
+			},
 			[Faction.Alliance]: {
-// 				1: WarlockPresets.P1_DESTRO.gear,
-// 				2: WarlockPresets.P2_DESTRO.gear,
-// 				3: WarlockPresets.P3_DESTRO.gear,
-// 				4: WarlockPresets.P4_DESTRO.gear,
-// 				5: WarlockPresets.P5_DESTRO.gear,
+				1: WarlockPresets.P1_Preset_Affliction.gear,
+				2: WarlockPresets.P1_PreBiS_11.gear,
 			},
 			[Faction.Horde]: {
-// 				1: WarlockPresets.P1_DESTRO.gear,
-// 				2: WarlockPresets.P2_DESTRO.gear,
-// 				3: WarlockPresets.P3_DESTRO.gear,
-// 				4: WarlockPresets.P4_DESTRO.gear,
-// 				5: WarlockPresets.P5_DESTRO.gear,
+				1: WarlockPresets.P1_Preset_Affliction.gear,
+				2: WarlockPresets.P1_PreBiS_11.gear,
 			},
 		},
 		otherDefaults: WarlockPresets.OtherDefaults,
-		tooltip: 'Affliction Warlock: by default casts CoE with Malediction',
+		tooltip: 'Affliction Warlock: Adds Improved Fel Intelligence',
 		iconUrl: talentTreeIcons[Class.ClassWarlock][0],
 	},
-	/*	{
-			spec: Spec.SpecWarlock,
-			rotation: WarlockPresets.DemonologyRotation,
-			talents: WarlockPresets.DemonologistTalents.data,
-			specOptions: WarlockPresets.DemonologyOptions,
-			consumes: WarlockPresets.DefaultConsumes,
-			defaultName: 'Demo Warlock',
-			defaultFactionRaces: {
-				[Faction.Unknown]: Race.RaceUnknown,
-				[Faction.Alliance]: Race.RaceHuman,
-				[Faction.Horde]: Race.RaceBloodElf,
+	{
+		spec: Spec.SpecWarlock,
+		rotation: WarlockPresets.DemonologyRotation,
+		talents: WarlockPresets.DemonologyTalents.data,
+		specOptions: WarlockPresets.DemonologyOptions,
+		consumes: WarlockPresets.DefaultConsumes,
+		defaultName: 'Demo Warlock',
+		defaultFactionRaces: {
+			[Faction.Unknown]: Race.RaceUnknown,
+			[Faction.Alliance]: Race.RaceHuman,
+			[Faction.Horde]: Race.RaceOrc,
+		},
+		defaultGear: {
+			[Faction.Unknown]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
 			},
-			defaultGear: {
-				[Faction.Unknown]: {},
-				[Faction.Alliance]: {
-					1: WarlockPresets.P1_DESTRO.gear,
-					2: WarlockPresets.P2_DESTRO.gear,
-					3: WarlockPresets.P3_DESTRO.gear,
-					4: WarlockPresets.P4_DESTRO.gear,
-					5: WarlockPresets.P5_DESTRO.gear,
-				},
-				[Faction.Horde]: {
-					1: WarlockPresets.P1_DESTRO.gear,
-					2: WarlockPresets.P2_DESTRO.gear,
-					3: WarlockPresets.P3_DESTRO.gear,
-					4: WarlockPresets.P4_DESTRO.gear,
-					5: WarlockPresets.P5_DESTRO.gear,
-				},
+			[Faction.Alliance]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
 			},
-			otherDefaults: WarlockPresets.OtherDefaults,
-			tooltip: 'Demonology Warlock',
-			iconUrl: talentTreeIcons[Class.ClassWarlock][1],
-		},*/
+			[Faction.Horde]: {
+				1: WarlockPresets.P1_Preset_Demo_Destro.gear,
+				2: WarlockPresets.P1_PreBiS_14.gear,
+			},
+		},
+		otherDefaults: WarlockPresets.OtherDefaults,
+		tooltip: 'Demonology Warlock: Adds Demonic Pact',
+		iconUrl: talentTreeIcons[Class.ClassWarlock][1],
+	},
 ];
 
 export const implementedSpecs: Array<Spec> = [...new Set(playerPresets.map(preset => preset.spec))];

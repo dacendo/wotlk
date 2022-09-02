@@ -43,16 +43,18 @@ func (dk *Deathknight) registerRaiseDeadCD() {
 		ApplyEffects: func(sim *core.Simulation, unit *core.Unit, spell *core.Spell) {
 			raiseDeadAura.Activate(sim)
 		},
-	})
-}
+	}, func(sim *core.Simulation) bool {
+		return !dk.Talents.MasterOfGhouls && dk.RaiseDead.IsReady(sim)
+	}, nil)
 
-func (dk *Deathknight) CanRaiseDead(sim *core.Simulation) bool {
-	return !dk.Talents.MasterOfGhouls && dk.RaiseDead.IsReady(sim)
-}
-
-func (dk *Deathknight) CastRaiseDead(sim *core.Simulation, target *core.Unit) bool {
-	if dk.CanRaiseDead(sim) {
-		return dk.RaiseDead.Cast(sim, target)
+	if !dk.Inputs.IsDps {
+		dk.AddMajorCooldown(core.MajorCooldown{
+			Spell:    dk.RaiseDead.Spell,
+			Type:     core.CooldownTypeSurvival,
+			Priority: core.CooldownPriorityLow,
+			ShouldActivate: func(sim *core.Simulation, character *core.Character) bool {
+				return dk.RaiseDead.CanCast(sim) && dk.CurrentHealthPercent() <= 0.5
+			},
+		})
 	}
-	return false
 }

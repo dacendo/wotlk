@@ -1005,6 +1005,19 @@ const idToCategoryMap: Record<number, number> = {
 	[27156]: 0.1, // Seal of Righteousness Proc
 	[20182]: 0.2, // Reckoning
 	[27179]: SPELL_ACTION_CATEGORY + 0.1, // Holy Shield
+	
+	[35395]: MELEE_ACTION_CATEGORY + 0.10, // Crusader Strike
+	[53385]: MELEE_ACTION_CATEGORY + 0.20, // Divine Storm
+	[53408]: SPELL_ACTION_CATEGORY + 0.10, // Judgement of Wisdom
+	[20271]: SPELL_ACTION_CATEGORY + 0.10, // Judgement of Light
+	[31804]: SPELL_ACTION_CATEGORY + 0.20, // Judgement of Vengeance
+	[20467]: SPELL_ACTION_CATEGORY + 0.20, // Judgement of Command
+	[20187]: SPELL_ACTION_CATEGORY + 0.20, // Judgement of Righteousness
+	[48801]: SPELL_ACTION_CATEGORY + 0.30, // Exorcism
+	[48819]: SPELL_ACTION_CATEGORY + 0.40, // Consecration
+	[48817]: SPELL_ACTION_CATEGORY + 0.50, // Holy Wrath
+	[48806]: SPELL_ACTION_CATEGORY + 0.60, // Hammer of Wrath
+	[54428]: SPELL_ACTION_CATEGORY + 0.70, // Divine Plea
 
 	// Rogue
 	[6774]: MELEE_ACTION_CATEGORY + 0.1, // Slice and Dice
@@ -1053,6 +1066,29 @@ const idToCategoryMap: Record<number, number> = {
 	[47241]: SPELL_ACTION_CATEGORY + 0.8, // Metamorphosis
 	[50589]: SPELL_ACTION_CATEGORY + 0.81, // Immolation Aura
 	[47193]: SPELL_ACTION_CATEGORY + 0.82, // Demonic Empowerment
+
+	// Mage
+	[42842]: SPELL_ACTION_CATEGORY + 0.01, // Frostbolt
+	[47610]: SPELL_ACTION_CATEGORY + 0.02, // Frostfire Bolt
+	[42897]: SPELL_ACTION_CATEGORY + 0.02, // Arcane Blast
+	[42833]: SPELL_ACTION_CATEGORY + 0.02, // Fireball
+	[42891]: SPELL_ACTION_CATEGORY + 0.1, // Pyroblast
+	[42846]: SPELL_ACTION_CATEGORY + 0.1, // Arcane Missiles
+	[55360]: SPELL_ACTION_CATEGORY + 0.2, //Living Bomb
+	[12848]: SPELL_ACTION_CATEGORY + 0.3, // Ignite
+	[12472]: SPELL_ACTION_CATEGORY + 0.4, // Icy Veins
+	[11129]: SPELL_ACTION_CATEGORY + 0.4, // Combustion
+	[12042]: SPELL_ACTION_CATEGORY + 0.4, // Arcane Power
+	[12043]: SPELL_ACTION_CATEGORY + 0.41, // Presence of Mind
+	[31687]: SPELL_ACTION_CATEGORY + 0.41, // Water Elemental
+	[55342]: SPELL_ACTION_CATEGORY + 0.5, // Mirror Image
+	[33312]: SPELL_ACTION_CATEGORY + 0.51, // Mana Gems
+	[12051]: SPELL_ACTION_CATEGORY + 0.52, // Evocate
+	[44401]: SPELL_ACTION_CATEGORY + 0.6, // Missile Barrage
+	[44448]: SPELL_ACTION_CATEGORY + 0.6, // Hot Streak
+	[12536]: SPELL_ACTION_CATEGORY + 0.61, // Clearcasting
+	// [55360]: SPELL_ACTION_CATEGORY + 0.6, // Fingers of Frost
+	// [55360]: SPELL_ACTION_CATEGORY + 0.61, // Brain Freeze
 
 
 	// Warrior

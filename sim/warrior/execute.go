@@ -1,7 +1,10 @@
 package warrior
 
 import (
+	"math"
+
 	"github.com/wowsims/wotlk/sim/core"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
@@ -18,6 +21,7 @@ func (warrior *Warrior) registerExecuteSpell() {
 	refundAmount := cost * 0.8
 
 	var extraRage float64
+	extraRageBonus := core.TernaryFloat64(warrior.HasMajorGlyph(proto.WarriorMajorGlyph_GlyphOfExecution), 10, 0)
 
 	warrior.Execute = warrior.RegisterSpell(core.SpellConfig{
 		ActionID:    core.ActionID{SpellID: 47471},
@@ -34,7 +38,7 @@ func (warrior *Warrior) registerExecuteSpell() {
 			},
 			IgnoreHaste: true,
 			ModifyCast: func(_ *core.Simulation, spell *core.Spell, cast *core.Cast) {
-				cast.Cost = spell.Unit.CurrentRage()
+				cast.Cost = math.Min(spell.Unit.CurrentRage(), 30)
 				extraRage = cast.Cost - spell.BaseCost
 			},
 		},
@@ -47,7 +51,7 @@ func (warrior *Warrior) registerExecuteSpell() {
 
 			BaseDamage: core.BaseDamageConfig{
 				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					return 1456 + hitEffect.MeleeAttackPower(spell.Unit)*0.2 + 38*extraRage
+					return 1456 + hitEffect.MeleeAttackPower(spell.Unit)*0.2 + 38*(extraRage+extraRageBonus)
 				},
 				TargetSpellCoefficient: 1,
 			},
@@ -60,6 +64,10 @@ func (warrior *Warrior) registerExecuteSpell() {
 			},
 		}),
 	})
+}
+
+func (warrior *Warrior) SpamExecute(spam bool) bool {
+	return warrior.CurrentRage() >= warrior.Execute.BaseCost && spam && warrior.Talents.MortalStrike
 }
 
 func (warrior *Warrior) CanExecute() bool {

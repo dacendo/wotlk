@@ -116,8 +116,9 @@ func (rp *RunicPowerBar) GainDeathRuneMetrics(sim *Simulation, spell *Spell, cur
 		}
 	}
 }
+
 func (rp *RunicPowerBar) CancelBloodTap(sim *Simulation) {
-	if rp.btslot == -1 {
+	if rp.btslot == -1 || rp.runeMeta[rp.btslot].revertOnSpend {
 		return
 	}
 	rp.ConvertFromDeath(sim, rp.btslot)
@@ -130,7 +131,7 @@ func (rp *RunicPowerBar) CorrectBloodTapConversion(sim *Simulation, bloodGainMet
 	// 2. if no active blood, convert inactive blood rune -> death rune
 	// 3. then convert one inactive death rune -> active
 
-	slot := int32(-1)
+	slot := int8(-1)
 	if rp.runeStates&isSpentDeath[0] == 0 {
 		slot = 0 //
 	} else if rp.runeStates&isSpentDeath[1] == 0 {

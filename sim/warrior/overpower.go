@@ -4,10 +4,15 @@ import (
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
 func (warrior *Warrior) registerOverpowerSpell(cdTimer *core.Timer) {
+	outcomeMask := core.OutcomeDodge
+	if warrior.HasMajorGlyph(proto.WarriorMajorGlyph_GlyphOfOverpower) {
+		outcomeMask |= core.OutcomeParry
+	}
 	warrior.RegisterAura(core.Aura{
 		Label:    "Overpower Trigger",
 		Duration: core.NeverExpires,
@@ -15,7 +20,7 @@ func (warrior *Warrior) registerOverpowerSpell(cdTimer *core.Timer) {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spellEffect.Outcome.Matches(core.OutcomeDodge) {
+			if spellEffect.Outcome.Matches(outcomeMask) {
 				warrior.overpowerValidUntil = sim.CurrentTime + time.Second*5
 			}
 		},
@@ -27,7 +32,7 @@ func (warrior *Warrior) registerOverpowerSpell(cdTimer *core.Timer) {
 	damageEffect := core.ApplyEffectFuncDirectDamage(core.SpellEffect{
 		ProcMask: core.ProcMaskMeleeMHSpecial,
 
-		DamageMultiplier: 1 + float64(warrior.Talents.UnrelentingAssault)*0.01,
+		DamageMultiplier: 1 + float64(warrior.Talents.UnrelentingAssault)*0.1,
 		ThreatMultiplier: 0.75,
 		BonusCritRating:  25 * core.CritRatingPerCritChance * float64(warrior.Talents.ImprovedOverpower),
 

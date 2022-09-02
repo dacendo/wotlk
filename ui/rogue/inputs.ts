@@ -1,5 +1,6 @@
 import { Spec } from '../core/proto/common.js';
 import { ActionId } from '../core/proto_utils/action_id.js';
+import { Player } from '../core/player.js';
 
 import * as InputHelpers from '../core/components/input_helpers.js';
 
@@ -20,6 +21,7 @@ export const MainHandImbue = InputHelpers.makeSpecOptionsEnumIconInput<Spec.Spec
 		{ color: 'grey', value: Poison.NoPoison },
 		{ actionId: ActionId.fromItemId(43233), value: Poison.DeadlyPoison },
 		{ actionId: ActionId.fromItemId(43231), value: Poison.InstantPoison },
+		{ actionId: ActionId.fromItemId(43235), value: Poison.WoundPoison },
 	],
 });
 
@@ -30,6 +32,7 @@ export const OffHandImbue = InputHelpers.makeSpecOptionsEnumIconInput<Spec.SpecR
 		{ color: 'grey', value: Poison.NoPoison },
 		{ actionId: ActionId.fromItemId(43233), value: Poison.DeadlyPoison },
 		{ actionId: ActionId.fromItemId(43231), value: Poison.InstantPoison },
+		{ actionId: ActionId.fromItemId(43235), value: Poison.WoundPoison },
 	],
 });
 
@@ -49,6 +52,7 @@ export const RogueRotationConfig = {
 			fieldName: 'minimumComboPointsExposeArmor',
 			label: 'Minimum CP (Expose Armor)',
 			labelTooltip: 'Minimum number of combo points for Expose Armor when only cast once.',
+			showWhen: (player: Player<Spec.SpecRogue>) => player.getRotation().exposeArmorFrequency == Frequency.Once,
 		}),
 		InputHelpers.makeRotationEnumInput<Spec.SpecRogue, Frequency>({
 			fieldName: 'tricksOfTheTradeFrequency',
@@ -67,6 +71,7 @@ export const RogueRotationConfig = {
 				{ name: 'Envenom > Rupture', value: AssassinationPriority.EnvenomRupture },
 				{ name: 'Rupture > Envenom', value: AssassinationPriority.RuptureEnvenom },
 			],
+			showWhen: (player: Player<Spec.SpecRogue>) => player.getTalents().mutilate
 		}),
 		InputHelpers.makeRotationEnumInput<Spec.SpecRogue, AssassinationPriority>({
 			fieldName: 'combatFinisherPriority',
@@ -76,6 +81,7 @@ export const RogueRotationConfig = {
 				{ name: 'Rupture > Eviscerate', value: CombatPriority.RuptureEviscerate },
 				{ name: 'Eviscerate > Rupture', value: CombatPriority.EviscerateRupture },
 			],
+			showWhen: (player: Player<Spec.SpecRogue>) => !player.getTalents().mutilate
 		}),
 		InputHelpers.makeRotationNumberInput<Spec.SpecRogue>({
 			fieldName: 'minimumComboPointsPrimaryFinisher',
@@ -96,11 +102,13 @@ export const RogueRotationConfig = {
 				{ name: 'Once', value: Frequency.Once },
 				{ name: 'Maintain', value: Frequency.Maintain },
 			],
+			showWhen: (player: Player<Spec.SpecRogue>) => player.getRotation().multiTargetSliceFrequency != Frequency.FrequencyUnknown
 		}),
 		InputHelpers.makeRotationNumberInput<Spec.SpecRogue>({
 			fieldName: 'minimumComboPointsMultiTargetSlice',
 			label: 'Minimum CP (Slice)',
 			labelTooltip: 'Minimum number of combo points spent if Slice and Dice has frequency: Once',
+			showWhen: (player: Player<Spec.SpecRogue>) => player.getRotation().multiTargetSliceFrequency == Frequency.Once
 		}),
 	],
 };

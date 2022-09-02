@@ -884,7 +884,7 @@ func init() {
 			Duration:  time.Second * 10,
 			MaxStacks: 3,
 			OnStacksChange: func(aura *core.Aura, sim *core.Simulation, oldStacks int32, newStacks int32) {
-				character.AddStatDynamic(sim, stats.ArmorPenetration, 435*float64(newStacks-oldStacks))
+				character.AddStatDynamic(sim, stats.ArmorPenetration, 62*float64(newStacks-oldStacks))
 			},
 		})
 
@@ -1066,6 +1066,38 @@ func init() {
 				} else if character.ShattFaction == proto.ShattrathFaction_ShattrathFactionScryer {
 					scryerSpell.Cast(sim, spellEffect.Target)
 				}
+			},
+		})
+	})
+	core.NewItemEffect(12590, func(agent core.Agent) {
+		character := agent.GetCharacter()
+		effectAura := character.GetOrRegisterAura(core.Aura{
+			Label:    "Felstriker Proc",
+			ActionID: core.ActionID{SpellID: 16551},
+			Duration: time.Second * 3,
+			OnGain: func(aura *core.Aura, sim *core.Simulation) {
+				character.PseudoStats.BonusMeleeCritRating += 100 * core.CritRatingPerCritChance
+			},
+			OnExpire: func(aura *core.Aura, sim *core.Simulation) {
+				character.PseudoStats.BonusMeleeCritRating -= 100 * core.CritRatingPerCritChance
+
+			},
+		})
+		ppmm := character.AutoAttacks.NewPPMManager(1.0, core.ProcMaskMelee)
+		character.GetOrRegisterAura(core.Aura{
+			Label:    "Felstriker",
+			Duration: core.NeverExpires,
+			OnReset: func(aura *core.Aura, sim *core.Simulation) {
+				aura.Activate(sim)
+			},
+			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMelee) {
+					return
+				}
+				if !ppmm.Proc(sim, spellEffect.ProcMask, "Felstriker") {
+					return
+				}
+				effectAura.Activate(sim)
 			},
 		})
 	})

@@ -58,29 +58,38 @@ func (dk *Deathknight) registerPestilenceSpell() {
 								dk.BloodPlagueDisease[unitHit.Index].Rollover(sim)
 							}
 						}
-						dk.botnAndReaping(sim, spell)
 					} else {
+						applyCryptEbon := false
 						// Apply diseases on every other target
 						if dk.FrostFeverDisease[dk.CurrentTarget.Index].IsActive() {
+							dk.FrostFeverExtended[unitHit.Index] = 0
 							dk.FrostFeverDisease[unitHit.Index].Apply(sim)
+							applyCryptEbon = true
 						}
 						if dk.BloodPlagueDisease[dk.CurrentTarget.Index].IsActive() {
+							dk.BloodPlagueExtended[unitHit.Index] = 0
 							dk.BloodPlagueDisease[unitHit.Index].Apply(sim)
+							applyCryptEbon = true
+						}
+						if applyCryptEbon {
+							if dk.Talents.CryptFever > 0 {
+								dk.CryptFeverAura[unitHit.Index].Activate(sim)
+							}
+							if dk.Talents.EbonPlaguebringer > 0 {
+								dk.EbonPlagueAura[unitHit.Index].Activate(sim)
+							}
 						}
 					}
 				}
 			},
 		}, true),
-	})
-}
-
-func (dk *Deathknight) CanPestilence(sim *core.Simulation) bool {
-	return dk.CastCostPossible(sim, 0.0, 1, 0, 0) && dk.Pestilence.IsReady(sim)
-}
-
-func (dk *Deathknight) CastPestilence(sim *core.Simulation, target *core.Unit) bool {
-	if dk.CanPestilence(sim) {
-		return dk.Pestilence.Cast(sim, target)
+	}, func(sim *core.Simulation) bool {
+		return dk.CastCostPossible(sim, 0.0, 1, 0, 0) && dk.Pestilence.IsReady(sim)
+	}, nil)
+	if dk.Talents.BloodOfTheNorth+dk.Talents.Reaping >= 3 {
+		rs.DeathConvertChance = 1.0
+	} else {
+		rs.DeathConvertChance = float64(dk.Talents.BloodOfTheNorth+dk.Talents.Reaping) * 0.33
 	}
-	return false
+	rs.ConvertType = RuneTypeBlood
 }

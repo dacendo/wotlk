@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
@@ -12,6 +13,7 @@ func (warrior *Warrior) registerWhirlwindSpell() {
 	if warrior.HasSetBonus(ItemSetWarbringerBattlegear, 2) {
 		cost -= 5
 	}
+	cd := core.TernaryDuration(warrior.HasMajorGlyph(proto.WarriorMajorGlyph_GlyphOfWhirlwind), time.Second*8, time.Second*10)
 
 	baseEffectMH := core.SpellEffect{
 		ProcMask: core.ProcMaskMeleeMHSpecial,
@@ -25,7 +27,9 @@ func (warrior *Warrior) registerWhirlwindSpell() {
 	baseEffectOH := core.SpellEffect{
 		ProcMask: core.ProcMaskMeleeOHSpecial,
 
-		DamageMultiplier: 1 + 0.02*float64(warrior.Talents.UnendingFury)*0.01*float64(warrior.Talents.ImprovedWhirlwind),
+		DamageMultiplier: 1 *
+			(1 + 0.02*float64(warrior.Talents.UnendingFury)) *
+			(1 + 0.1*float64(warrior.Talents.ImprovedWhirlwind)),
 		ThreatMultiplier: 1.25,
 
 		BaseDamage:     core.BaseDamageConfigMeleeWeapon(core.OffHand, true, 0, 1+0.05*float64(warrior.Talents.DualWieldSpecialization), 1, true),
@@ -67,7 +71,7 @@ func (warrior *Warrior) registerWhirlwindSpell() {
 			IgnoreHaste: true,
 			CD: core.Cooldown{
 				Timer:    warrior.NewTimer(),
-				Duration: time.Second * 10,
+				Duration: cd,
 			},
 		},
 

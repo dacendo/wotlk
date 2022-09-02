@@ -25,21 +25,18 @@ func (rogue *Rogue) ApplyTalents() {
 	rogue.AddStat(stats.SpellHit, core.SpellHitRatingPerHitChance*1*float64(rogue.Talents.Precision))
 	rogue.AddStat(stats.Expertise, core.ExpertisePerQuarterPercentReduction*5*float64(rogue.Talents.WeaponExpertise))
 	rogue.AddStat(stats.ArmorPenetration, core.ArmorPenPerPercentArmor*3*float64(rogue.Talents.SerratedBlades))
-
-	if rogue.Talents.DualWieldSpecialization > 0 {
-		rogue.AutoAttacks.OHEffect.BaseDamage.Calculator = core.BaseDamageFuncMeleeWeapon(core.OffHand, false, 0, 1+0.1*float64(rogue.Talents.DualWieldSpecialization), 1.0, true)
-	}
+	rogue.AutoAttacks.OHEffect.DamageMultiplier *= 1 + 0.1*float64(rogue.Talents.DualWieldSpecialization)
 
 	if rogue.Talents.Deadliness > 0 {
-		rogue.AddStatDependency(stats.AttackPower, stats.AttackPower, 1.0+0.02*float64(rogue.Talents.Deadliness))
+		rogue.MultiplyStat(stats.AttackPower, 1.0+0.02*float64(rogue.Talents.Deadliness))
 	}
 
 	if rogue.Talents.SavageCombat > 0 {
-		rogue.AddStatDependency(stats.AttackPower, stats.AttackPower, 1.0+0.02*float64(rogue.Talents.SavageCombat))
+		rogue.MultiplyStat(stats.AttackPower, 1.0+0.02*float64(rogue.Talents.SavageCombat))
 	}
 
 	if rogue.Talents.SinisterCalling > 0 {
-		rogue.AddStatDependency(stats.Agility, stats.Agility, 1.0+0.03*float64(rogue.Talents.SinisterCalling))
+		rogue.MultiplyStat(stats.Agility, 1.0+0.03*float64(rogue.Talents.SinisterCalling))
 	}
 
 	rogue.registerOverkillCD()
@@ -385,17 +382,21 @@ func (rogue *Rogue) registerBladeFlurryCD() {
 			if spellEffect.Damage == 0 || !spellEffect.ProcMask.Matches(core.ProcMaskMelee) {
 				return
 			}
+			// Fan of Knives off-hand hits are not cloned
+			if spell.IsSpellAction(FanOfKnivesSpellID) && spellEffect.ProcMask.Matches(core.ProcMaskMeleeOH) {
+				return
+			}
 
 			// Undo armor reduction to get the raw damage value.
 			curDmg = spellEffect.Damage / rogue.AttackTables[spellEffect.Target.Index].ArmorDamageModifier
 
 			bfHit.Cast(sim, rogue.Env.NextTargetUnit(spellEffect.Target))
-			bfHit.SpellMetrics[spellEffect.Target.TableIndex].Casts--
+			bfHit.SpellMetrics[spellEffect.Target.UnitIndex].Casts--
 		},
 	})
 
 	cooldownDur := time.Minute * 2
-	bladeFlurrySpell := rogue.RegisterSpell(core.SpellConfig{
+	rogue.BladeFlurry = rogue.RegisterSpell(core.SpellConfig{
 		ActionID: BladeFlurryActionID,
 
 		ResourceType: stats.Energy,
@@ -411,6 +412,11 @@ func (rogue *Rogue) registerBladeFlurryCD() {
 				Timer:    rogue.NewTimer(),
 				Duration: cooldownDur,
 			},
+			ModifyCast: func(s1 *core.Simulation, s2 *core.Spell, c *core.Cast) {
+				if rogue.HasMajorGlyph(proto.RogueMajorGlyph_GlyphOfBladeFlurry) {
+					c.Cost = 0
+				}
+			},
 		},
 
 		ApplyEffects: func(sim *core.Simulation, _ *core.Unit, spell *core.Spell) {
@@ -419,7 +425,7 @@ func (rogue *Rogue) registerBladeFlurryCD() {
 	})
 
 	rogue.AddMajorCooldown(core.MajorCooldown{
-		Spell:    bladeFlurrySpell,
+		Spell:    rogue.BladeFlurry,
 		Type:     core.CooldownTypeDPS,
 		Priority: core.CooldownPriorityDefault,
 		CanActivate: func(sim *core.Simulation, character *core.Character) bool {
@@ -454,14 +460,16 @@ func (rogue *Rogue) registerAdrenalineRushCD() {
 	rogue.AdrenalineRushAura = rogue.RegisterAura(core.Aura{
 		Label:    "Adrenaline Rush",
 		ActionID: AdrenalineRushActionID,
-		Duration: time.Second * 15,
+		Duration: core.TernaryDuration(rogue.HasMajorGlyph(proto.RogueMajorGlyph_GlyphOfAdrenalineRush), time.Second*20, time.Second*15),
 		OnGain: func(aura *core.Aura, sim *core.Simulation) {
 			rogue.ResetEnergyTick(sim)
 			rogue.ApplyEnergyTickMultiplier(2.0)
+			rogue.rotationItems = rogue.planRotation(sim)
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
 			rogue.ResetEnergyTick(sim)
 			rogue.ApplyEnergyTickMultiplier(1 / 2.0)
+			rogue.rotationItems = rogue.planRotation(sim)
 		},
 	})
 

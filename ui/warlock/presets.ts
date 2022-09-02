@@ -1,6 +1,7 @@
 import { Consumes,
 	Flask,
 	Food,
+  PetFood,
 	Glyphs,
 	EquipmentSpec,
 	Potions,
@@ -69,7 +70,7 @@ export const DestructionTalents = {
 		talentsString: '-03310030003-05203205210331051335230351',
 		glyphs: Glyphs.create({
 			major1: MajorGlyph.GlyphOfConflagrate,
-			major2: MajorGlyph.GlyphOfImp,
+			major2: MajorGlyph.GlyphOfLifeTap,
 			major3: MajorGlyph.GlyphOfIncinerate,
 			minor1: MinorGlyph.GlyphOfSouls,
 			minor2: MinorGlyph.GlyphOfDrainSoul,
@@ -126,6 +127,7 @@ export const DestructionOptions = WarlockOptions.create({
 export const DefaultConsumes = Consumes.create({
 	flask: Flask.FlaskOfTheFrostWyrm,
 	food: Food.FoodFishFeast,
+	petFood: PetFood.PetFoodSpicedMammothTreats,
 	defaultPotion: Potions.PotionOfWildMagic,
 	prepopPotion:  Potions.PotionOfWildMagic,
 });
@@ -291,7 +293,7 @@ export const SWP_BIS = {
       ]}
     `),
 };
-export const P1_PreBiS = {
+export const P1_PreBiS_11 = {
 	name: 'Pre-Raid Affliction',
 	tooltip: WarlockTooltips.BIS_TOOLTIP,
   enableWhen: (player: Player<Spec.SpecWarlock>) => player.getRotation().type == RotationType.Affliction,
@@ -326,7 +328,7 @@ export const P1_PreBiS = {
         },
         {
           "id": 39497,
-          "enchant": 44623,
+          "enchant": 44489,
           "gems": [
             39998,
             40051
@@ -401,8 +403,8 @@ export const P1_PreBiS = {
     }
   `),
 }
-export const P1_BiS_14 = {
-  name: 'P1 Preset',
+export const P1_Preset_Demo_Destro = {
+  name: 'P1 Preset Demo / Destro',
   tooltip: WarlockTooltips.BIS_TOOLTIP,
   enableWhen: (player: Player<Spec.SpecWarlock>) => player.getRotation().type == RotationType.Demonology || player.getRotation().type == RotationType.Destruction,
   gear: EquipmentSpec.fromJsonString(`
@@ -438,7 +440,7 @@ export const P1_BiS_14 = {
         },
         {
           "id": 40423,
-          "enchant": 44623,
+          "enchant": 44489,
           "gems": [
             40049,
             40014
@@ -501,8 +503,10 @@ export const P1_BiS_14 = {
   `),
 }
 
-export const P1_BiS = {
-	name: 'P1 Affliction',
+
+// will have only rare gems, but a Lightweave Embroidery on cloak.
+export const P1_Preset_Affliction = {
+	name: 'P1 Affliction Preset',
 	tooltip: WarlockTooltips.BIS_TOOLTIP,
   enableWhen: (player: Player<Spec.SpecWarlock>) => player.getRotation().type == RotationType.Affliction,
 	gear: EquipmentSpec.fromJsonString(`
@@ -538,7 +542,7 @@ export const P1_BiS = {
         },
         {
           "id": 40423,
-          "enchant": 44623,
+          "enchant": 44489,
           "gems": [
             39998,
             40051
@@ -600,6 +604,8 @@ export const P1_BiS = {
     }
   `),
 }
+
+
 export const P1_PreBiS_14 = {
   name: 'Pre-Raid Preset',
   tooltip: WarlockTooltips.BIS_TOOLTIP,
@@ -635,7 +641,7 @@ export const P1_PreBiS_14 = {
         },
         {
           "id": 39497,
-          "enchant": 44623,
+          "enchant": 44489,
           "gems": [
             39998,
             40014

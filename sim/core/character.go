@@ -23,9 +23,6 @@ type Character struct {
 	// Current gear.
 	Equip items.Equipment
 
-	// Pets owned by this Character.
-	Pets []PetAgent
-
 	// Consumables this Character will be using.
 	Consumes proto.Consumes
 
@@ -69,6 +66,8 @@ func NewCharacter(party *Party, partyIndex int, player proto.Player) Character {
 			auraTracker: newAuraTracker(),
 			PseudoStats: stats.NewPseudoStats(),
 			Metrics:     NewUnitMetrics(),
+
+			StatDependencyManager: stats.NewStatDependencyManager(),
 
 			DistanceFromTarget: player.DistanceFromTarget,
 		},
@@ -131,8 +130,8 @@ func NewCharacter(party *Party, partyIndex int, player proto.Player) Character {
 }
 
 func (character *Character) addUniversalStatDependencies() {
-	character.AddStatDependency(stats.Stamina, stats.Health, 1.0+10)
-	character.AddStatDependency(stats.Agility, stats.Armor, 1.0+2)
+	character.AddStatDependency(stats.Stamina, stats.Health, 10)
+	character.AddStatDependency(stats.Agility, stats.Armor, 2)
 }
 
 // Empty implementation so its optional for Agents.
@@ -144,22 +143,22 @@ func (character *Character) applyAllEffects(agent Agent, raidBuffs proto.RaidBuf
 
 	applyRaceEffects(agent)
 	character.applyProfessionEffects()
-	playerStats.BaseStats = character.applyStatDependencies(character.stats).ToFloatArray()
+	playerStats.BaseStats = character.SortAndApplyStatDependencies(character.stats).ToFloatArray()
 
 	character.AddStats(character.Equip.Stats())
 	character.applyItemEffects(agent)
 	character.applyItemSetBonusEffects(agent)
 	agent.ApplyGearBonuses()
-	playerStats.GearStats = character.applyStatDependencies(character.stats).ToFloatArray()
+	playerStats.GearStats = character.SortAndApplyStatDependencies(character.stats).ToFloatArray()
 
 	agent.ApplyTalents()
-	playerStats.TalentsStats = character.applyStatDependencies(character.stats).ToFloatArray()
+	playerStats.TalentsStats = character.SortAndApplyStatDependencies(character.stats).ToFloatArray()
 
 	applyBuffEffects(agent, raidBuffs, partyBuffs, individualBuffs)
-	playerStats.BuffsStats = character.applyStatDependencies(character.stats).ToFloatArray()
+	playerStats.BuffsStats = character.SortAndApplyStatDependencies(character.stats).ToFloatArray()
 
 	applyConsumeEffects(agent, raidBuffs, partyBuffs)
-	playerStats.ConsumesStats = character.applyStatDependencies(character.stats).ToFloatArray()
+	playerStats.ConsumesStats = character.SortAndApplyStatDependencies(character.stats).ToFloatArray()
 
 	for _, petAgent := range character.Pets {
 		applyPetBuffEffects(petAgent, raidBuffs, partyBuffs, individualBuffs)
@@ -235,25 +234,6 @@ func (character *Character) MultiplyAttackSpeed(sim *Simulation, amount float64)
 	if len(character.Pets) > 0 {
 		for _, petAgent := range character.Pets {
 			petAgent.OwnerAttackSpeedChanged(sim)
-		}
-	}
-}
-
-func (character *Character) AddStatsDynamic(sim *Simulation, stat stats.Stats) {
-	character.Unit.AddStatsDynamic(sim, stat)
-
-	if len(character.Pets) > 0 {
-		for _, petAgent := range character.Pets {
-			petAgent.GetPet().addOwnerStats(sim, stat)
-		}
-	}
-}
-func (character *Character) AddStatDynamic(sim *Simulation, stat stats.Stat, amount float64) {
-	character.Unit.AddStatDynamic(sim, stat, amount)
-
-	if len(character.Pets) > 0 {
-		for _, petAgent := range character.Pets {
-			petAgent.GetPet().addOwnerStat(sim, stat, amount)
 		}
 	}
 }
@@ -337,9 +317,6 @@ func (character *Character) Finalize(playerStats *proto.PlayerStats) {
 		return
 	}
 
-	character.finalizeStatDeps()
-	character.stats = character.applyStatDependencies(character.stats)
-
 	character.PseudoStats.ParryHaste = character.PseudoStats.CanParry
 
 	character.Unit.finalize()
@@ -361,6 +338,7 @@ func (character *Character) reset(sim *Simulation, agent Agent) {
 	character.ExpectedBonusMana = 0
 	character.majorCooldownManager.reset(sim)
 	character.Unit.reset(sim, agent)
+	character.Unit.CurrentTarget = &character.Env.Encounter.Targets[0].Unit
 
 	if character.Type == PlayerUnit {
 		character.SetGCDTimer(sim, 0)
@@ -490,6 +468,7 @@ func (character *Character) doneIteration(sim *Simulation) {
 func (character *Character) GetMetricsProto(numIterations int32) *proto.UnitMetrics {
 	metrics := character.Metrics.ToProto(numIterations)
 	metrics.Name = character.Name
+	metrics.UnitIndex = character.UnitIndex
 	metrics.Auras = character.auraTracker.GetMetricsProto(numIterations)
 
 	metrics.Pets = []*proto.UnitMetrics{}

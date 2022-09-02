@@ -26,8 +26,8 @@ func RegisterBalanceDruid() {
 
 func NewBalanceDruid(character core.Character, options proto.Player) *BalanceDruid {
 	balanceOptions := options.GetBalanceDruid()
-
 	selfBuffs := druid.SelfBuffs{}
+
 	if balanceOptions.Options.InnervateTarget != nil {
 		selfBuffs.InnervateTarget = *balanceOptions.Options.InnervateTarget
 	} else {
@@ -35,22 +35,30 @@ func NewBalanceDruid(character core.Character, options proto.Player) *BalanceDru
 	}
 
 	moonkin := &BalanceDruid{
-		Druid:           druid.New(character, druid.Moonkin, selfBuffs, *balanceOptions.Talents),
-		primaryRotation: *balanceOptions.Rotation,
-		useBattleRes:    balanceOptions.Options.BattleRes,
+		Druid:                    druid.New(character, druid.Moonkin, selfBuffs, *balanceOptions.Talents),
+		primaryRotation:          *balanceOptions.Rotation,
+		useBattleRes:             balanceOptions.Options.BattleRes,
+		useIS:                    balanceOptions.Options.UseIs,
+		useMF:                    balanceOptions.Options.UseMf,
+		mfInsideEclipseThreshold: balanceOptions.Options.MfInsideEclipseThreshold,
+		isInsideEclipseThreshold: balanceOptions.Options.IsInsideEclipseThreshold,
 	}
 
+	moonkin.ResetTalentsBonuses()
+	moonkin.RegisterTalentsBonuses()
 	moonkin.EnableResumeAfterManaWait(moonkin.tryUseGCD)
-
 	return moonkin
 }
 
 type BalanceDruid struct {
 	*druid.Druid
 
-	primaryRotation proto.BalanceDruid_Rotation
-	useBattleRes    bool
-
+	primaryRotation          proto.BalanceDruid_Rotation
+	useBattleRes             bool
+	useIS                    bool
+	useMF                    bool
+	mfInsideEclipseThreshold float32
+	isInsideEclipseThreshold float32
 	// These are only used when primary spell is set to 'Adaptive'. When the mana
 	// tracker tells us we have extra mana to spare, use surplusRotation instead of
 	// primaryRotation.
@@ -74,4 +82,5 @@ func (moonkin *BalanceDruid) Reset(sim *core.Simulation) {
 		moonkin.manaTracker.Reset()
 	}
 	moonkin.Druid.Reset(sim)
+	moonkin.RebirthTiming = moonkin.Env.BaseDuration.Seconds() * sim.RandomFloat("Rebirth Timing")
 }

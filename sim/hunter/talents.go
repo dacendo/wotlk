@@ -23,7 +23,7 @@ func (hunter *Hunter) ApplyTalents() {
 		hunter.pet.PseudoStats.MeleeSpeedMultiplier *= 1 + 0.04*float64(hunter.Talents.SerpentsSwiftness)
 
 		if hunter.Talents.AnimalHandler != 0 {
-			hunter.pet.AddStatDependency(stats.AttackPower, stats.AttackPower, 1.0+(0.05*float64(hunter.Talents.AnimalHandler)))
+			hunter.pet.MultiplyStat(stats.AttackPower, 1+(0.05*float64(hunter.Talents.AnimalHandler)))
 		}
 		hunter.pet.ApplyTalents()
 	}
@@ -34,15 +34,16 @@ func (hunter *Hunter) ApplyTalents() {
 	hunter.AddStat(stats.Parry, core.ParryRatingPerParryChance*1*float64(hunter.Talents.Deflection))
 	hunter.AddStat(stats.Dodge, 1*core.DodgeRatingPerDodgeChance*float64(hunter.Talents.CatlikeReflexes))
 	hunter.PseudoStats.RangedSpeedMultiplier *= 1 + 0.04*float64(hunter.Talents.SerpentsSwiftness)
-	hunter.PseudoStats.RangedDamageDealtMultiplier *= 1 + 0.01*float64(hunter.Talents.RangedWeaponSpecialization)
+	hunter.PseudoStats.RangedDamageDealtMultiplier *= 1 + []float64{0, .01, .03, .05}[hunter.Talents.RangedWeaponSpecialization]
 	hunter.PseudoStats.BonusRangedCritRating += 1 * float64(hunter.Talents.LethalShots) * core.CritRatingPerCritChance
 	hunter.PseudoStats.DamageTakenMultiplier *= 1 - 0.02*float64(hunter.Talents.SurvivalInstincts)
+	hunter.AutoAttacks.RangedEffect.DamageMultiplier *= hunter.markedForDeathMultiplier()
 
 	if hunter.Talents.EnduranceTraining > 0 {
 		healthBonus := 0.01 * float64(hunter.Talents.EnduranceTraining)
-		hunter.AddStatDependency(stats.Health, stats.Health, 1.0+healthBonus)
+		hunter.MultiplyStat(stats.Health, 1.0+healthBonus)
 		if hunter.pet != nil {
-			hunter.pet.AddStatDependency(stats.Health, stats.Health, 1.0+2*healthBonus)
+			hunter.pet.MultiplyStat(stats.Health, 1.0+2*healthBonus)
 		}
 	}
 
@@ -60,35 +61,35 @@ func (hunter *Hunter) ApplyTalents() {
 		}
 		hunter.AddStat(stats.Armor, hunter.Equip.Stats()[stats.Armor]*hunterBonus)
 		if hunter.pet != nil {
-			hunter.pet.AddStatDependency(stats.Armor, stats.Armor, 1.0+petBonus)
+			hunter.pet.MultiplyStat(stats.Armor, 1.0+petBonus)
 		}
 	}
 
 	if hunter.Talents.Survivalist > 0 {
-		hunter.AddStatDependency(stats.Stamina, stats.Stamina, 1.0+0.02*float64(hunter.Talents.Survivalist))
+		hunter.MultiplyStat(stats.Stamina, 1.0+0.02*float64(hunter.Talents.Survivalist))
 	}
 
 	if hunter.Talents.CombatExperience > 0 {
 		bonus := 1.0 + (0.02 * float64(hunter.Talents.CombatExperience))
-		hunter.AddStatDependency(stats.Agility, stats.Agility, bonus)
-		hunter.AddStatDependency(stats.Intellect, stats.Intellect, bonus)
+		hunter.MultiplyStat(stats.Agility, bonus)
+		hunter.MultiplyStat(stats.Intellect, bonus)
 	}
 	if hunter.Talents.CarefulAim > 0 {
-		hunter.AddStatDependency(stats.Intellect, stats.RangedAttackPower, 1+(1.0/3.0)*float64(hunter.Talents.CarefulAim))
+		hunter.AddStatDependency(stats.Intellect, stats.RangedAttackPower, (1.0/3.0)*float64(hunter.Talents.CarefulAim))
 	}
 	if hunter.Talents.HunterVsWild > 0 {
-		bonus := 1.0 + 0.1*float64(hunter.Talents.HunterVsWild)
+		bonus := 0.1 * float64(hunter.Talents.HunterVsWild)
 		hunter.AddStatDependency(stats.Stamina, stats.AttackPower, bonus)
 		hunter.AddStatDependency(stats.Stamina, stats.RangedAttackPower, bonus)
 	}
 	if hunter.Talents.LightningReflexes > 0 {
 		agiBonus := 0.03 * float64(hunter.Talents.LightningReflexes)
-		hunter.AddStatDependency(stats.Agility, stats.Agility, 1.0+agiBonus)
+		hunter.MultiplyStat(stats.Agility, 1.0+agiBonus)
 	}
 	if hunter.Talents.HuntingParty > 0 {
 		// TODO: Activate replenishment
 		agiBonus := 0.01 * float64(hunter.Talents.HuntingParty)
-		hunter.AddStatDependency(stats.Agility, stats.Agility, 1.0+agiBonus)
+		hunter.MultiplyStat(stats.Agility, 1.0+agiBonus)
 	}
 
 	hunter.applySpiritBond()
@@ -119,6 +120,14 @@ func (hunter *Hunter) critMultiplier(isRanged bool, isMFDSpell bool, target *cor
 	}
 
 	return hunter.MeleeCritMultiplier(primaryModifier, secondaryModifier)
+}
+
+func (hunter *Hunter) markedForDeathMultiplier() float64 {
+	if hunter.Options.UseHuntersMark || hunter.Env.GetTarget(0).HasAuraWithTag(core.HuntersMarkAuraTag) {
+		return 1 + .01*float64(hunter.Talents.MarkedForDeath)
+	} else {
+		return 1
+	}
 }
 
 func (hunter *Hunter) applySpiritBond() {
@@ -313,7 +322,7 @@ func (hunter *Hunter) applyWildQuiver() {
 		Flags:       core.SpellFlagNoOnCastComplete,
 
 		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskEmpty,
+			ProcMask:         core.ProcMaskRangedAuto,
 			DamageMultiplier: 0.8,
 			ThreatMultiplier: 1,
 
@@ -329,7 +338,7 @@ func (hunter *Hunter) applyWildQuiver() {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskRangedAuto) {
+			if spell != hunter.AutoAttacks.RangedAuto {
 				return
 			}
 
@@ -505,7 +514,7 @@ func (hunter *Hunter) applyImprovedTracking() {
 						proto.MobType_MobTypeGiant, proto.MobType_MobTypeHumanoid,
 						proto.MobType_MobTypeUndead:
 
-						hunter.AttackTables[target.TableIndex].DamageDealtMultiplier *= 1.0 + 0.01*float64(hunter.Talents.ImprovedTracking)
+						hunter.AttackTables[target.UnitIndex].DamageDealtMultiplier *= 1.0 + 0.01*float64(hunter.Talents.ImprovedTracking)
 					}
 				}
 				applied = true
@@ -539,9 +548,9 @@ func (hunter *Hunter) applyLockAndLoad() {
 			}
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
-			hunter.ArcaneShot.CostMultiplier -= 1
+			hunter.ArcaneShot.CostMultiplier += 1
 			if hunter.ExplosiveShot != nil {
-				hunter.ExplosiveShot.CostMultiplier -= 1
+				hunter.ExplosiveShot.CostMultiplier += 1
 			}
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
@@ -615,16 +624,19 @@ func (hunter *Hunter) applyExposeWeakness() {
 	actionID := core.ActionID{SpellID: 34503}
 	procChance := float64(hunter.Talents.ExposeWeakness) / 3
 
-	var curBonus stats.Stats
+	apDep := hunter.NewDynamicStatDependency(stats.Agility, stats.AttackPower, .25)
+	rapDep := hunter.NewDynamicStatDependency(stats.Agility, stats.RangedAttackPower, .25)
 	procAura := hunter.RegisterAura(core.Aura{
 		Label:    "Expose Weakness Proc",
 		ActionID: actionID,
 		Duration: time.Second * 7,
 		OnGain: func(aura *core.Aura, sim *core.Simulation) {
-			aura.Unit.AddStatsDynamic(sim, curBonus)
+			aura.Unit.EnableDynamicStatDep(sim, apDep)
+			aura.Unit.EnableDynamicStatDep(sim, rapDep)
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
-			aura.Unit.AddStatsDynamic(sim, curBonus.Multiply(-1))
+			aura.Unit.DisableDynamicStatDep(sim, apDep)
+			aura.Unit.DisableDynamicStatDep(sim, rapDep)
 		},
 	})
 
@@ -644,14 +656,6 @@ func (hunter *Hunter) applyExposeWeakness() {
 			}
 
 			if procChance == 1 || sim.RandomFloat("ExposeWeakness") < procChance {
-				procAura.Deactivate(sim)
-
-				val := hunter.GetStat(stats.Agility) * 0.25
-				curBonus = stats.Stats{
-					stats.AttackPower:       val,
-					stats.RangedAttackPower: val,
-				}
-
 				procAura.Activate(sim)
 			}
 		},
@@ -783,6 +787,9 @@ func (hunter *Hunter) registerReadinessCD() {
 		CanActivate: func(sim *core.Simulation, character *core.Character) bool {
 			// Don't use if there are no cooldowns to reset.
 			return !hunter.RapidFire.IsReady(sim)
+		},
+		ShouldActivate: func(sim *core.Simulation, character *core.Character) bool {
+			return !hunter.RapidFireAura.IsActive() || hunter.RapidFireAura.RemainingDuration(sim) < time.Second*10
 		},
 	})
 }

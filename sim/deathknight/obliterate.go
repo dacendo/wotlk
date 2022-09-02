@@ -16,7 +16,7 @@ func (dk *Deathknight) newObliterateHitSpell(isMH bool, onhit func(sim *core.Sim
 		weaponBaseDamage = core.BaseDamageFuncMeleeWeapon(core.OffHand, true, 584.0+bonusBaseDamage, dk.nervesOfColdSteelBonus(), 0.8, true)
 	}
 
-	diseaseMulti := dk.diseaseMultiplier(0.125)
+	diseaseMulti := dk.dkDiseaseMultiplier(0.125)
 
 	effect := core.SpellEffect{
 		BonusCritRating:  (dk.rimeCritBonus() + dk.subversionCritBonus() + dk.annihilationCritBonus() + dk.scourgeborneBattlegearCritBonus()) * core.CritRatingPerCritChance,
@@ -26,7 +26,7 @@ func (dk *Deathknight) newObliterateHitSpell(isMH bool, onhit func(sim *core.Sim
 		BaseDamage: core.BaseDamageConfig{
 			Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
 				return weaponBaseDamage(sim, hitEffect, spell) *
-					(1.0 + dk.countActiveDiseases(hitEffect.Target)*diseaseMulti) *
+					(1.0 + dk.dkCountActiveDiseases(hitEffect.Target)*diseaseMulti) *
 					dk.RoRTSBonus(hitEffect.Target) *
 					dk.mercilessCombatBonus(sim)
 			},
@@ -63,9 +63,21 @@ func (dk *Deathknight) newObliterateHitSpell(isMH bool, onhit func(sim *core.Sim
 			IgnoreHaste: true,
 		}
 		conf.ApplyEffects = dk.withRuneRefund(rs, effect, false)
+		if dk.Talents.DeathRuneMastery == 3 {
+			rs.DeathConvertChance = 1.0
+		} else {
+			rs.DeathConvertChance = float64(dk.Talents.DeathRuneMastery) * 0.33
+		}
+		rs.ConvertType = RuneTypeFrost | RuneTypeUnholy
 	}
 
-	return dk.RegisterSpell(rs, conf)
+	if isMH {
+		return dk.RegisterSpell(rs, conf, func(sim *core.Simulation) bool {
+			return dk.CastCostPossible(sim, 0.0, 0, 1, 1) && dk.Obliterate.IsReady(sim)
+		}, nil)
+	} else {
+		return dk.RegisterSpell(rs, conf, nil, nil)
+	}
 }
 
 func (dk *Deathknight) registerObliterateSpell() {
@@ -86,15 +98,4 @@ func (dk *Deathknight) registerObliterateSpell() {
 	})
 	dk.ObliterateOhHit = dk.newObliterateHitSpell(false, nil)
 	dk.Obliterate = dk.ObliterateMhHit
-}
-
-func (dk *Deathknight) CanObliterate(sim *core.Simulation) bool {
-	return dk.CastCostPossible(sim, 0.0, 0, 1, 1) && dk.Obliterate.IsReady(sim)
-}
-
-func (dk *Deathknight) CastObliterate(sim *core.Simulation, target *core.Unit) bool {
-	if dk.Obliterate.IsReady(sim) {
-		return dk.Obliterate.Cast(sim, target)
-	}
-	return false
 }

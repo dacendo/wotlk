@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
-func (warrior *Warrior) registerMortalStrikeSpell(cdTimer *core.Timer, rageThreshold float64) {
+func (warrior *Warrior) registerMortalStrikeSpell(cdTimer *core.Timer) {
 	cost := 30.0
 	if warrior.HasSetBonus(ItemSetDestroyerBattlegear, 4) {
 		cost -= 5
@@ -39,8 +40,10 @@ func (warrior *Warrior) registerMortalStrikeSpell(cdTimer *core.Timer, rageThres
 
 			DamageMultiplier: 1 *
 				(1 + 0.01*float64(warrior.Talents.ImprovedMortalStrike)) *
+				core.TernaryFloat64(warrior.HasMajorGlyph(proto.WarriorMajorGlyph_GlyphOfMortalStrike), 1.1, 1) *
 				core.TernaryFloat64(warrior.HasSetBonus(ItemSetOnslaughtBattlegear, 4), 1.05, 1),
 			ThreatMultiplier: 1,
+			BonusCritRating:  core.TernaryFloat64(warrior.HasSetBonus(ItemSetSiegebreakerBattlegear, 4), 10, 0) * core.CritRatingPerCritChance,
 
 			BaseDamage:     core.BaseDamageConfigMeleeWeapon(core.MainHand, true, 80, 1, 1, true),
 			OutcomeApplier: warrior.OutcomeFuncMeleeWeaponSpecialHitAndCrit(warrior.critMultiplier(true)),
@@ -57,9 +60,8 @@ func (warrior *Warrior) registerMortalStrikeSpell(cdTimer *core.Timer, rageThres
 			},
 		}),
 	})
-	warrior.MsRageThreshold = core.MaxFloat(warrior.MortalStrike.DefaultCast.Cost, rageThreshold)
 }
 
 func (warrior *Warrior) CanMortalStrike(sim *core.Simulation) bool {
-	return warrior.Talents.MortalStrike && warrior.CurrentRage() >= warrior.MsRageThreshold && warrior.MortalStrike.IsReady(sim)
+	return warrior.Talents.MortalStrike && warrior.CurrentRage() >= warrior.MortalStrike.DefaultCast.Cost && warrior.MortalStrike.IsReady(sim)
 }

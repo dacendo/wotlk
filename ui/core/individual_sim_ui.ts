@@ -1,4 +1,5 @@
-import { BattleElixir } from './proto/common.js';
+import { ActionId } from './proto_utils/action_id.js';
+import { BattleElixir, HandType } from './proto/common.js';
 import { BonusStatsPicker } from './components/bonus_stats_picker.js';
 import { BooleanPicker, BooleanPickerConfig } from './components/boolean_picker.js';
 import { CharacterStats, StatMods } from './components/character_stats.js';
@@ -270,6 +271,19 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 				}
 			},
 		});
+		this.addWarning({
+			updateOn: TypedEvent.onAny([this.player.gearChangeEmitter, this.player.talentsChangeEmitter]),
+			getContent: () => {
+				if (!this.player.canDualWield2H() && 
+				(this.player.getEquippedItem(ItemSlot.ItemSlotMainHand)?.item.handType == HandType.HandTypeTwoHand && 
+				this.player.getEquippedItem(ItemSlot.ItemSlotOffHand) != null ||
+				this.player.getEquippedItem(ItemSlot.ItemSlotOffHand)?.item.handType == HandType.HandTypeTwoHand)) {
+						return "Dual wielding two-handed weapon(s) without Titan's Grip spec."
+				} else {
+					return '';
+				}
+			},
+		});
 		(config.warnings || []).forEach(warning => this.addWarning(warning(this)));
 
 		if (!this.isWithinRaidSim) {
@@ -460,6 +474,7 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 						<div class="consumes-row">
 							<span>Potions</span>
 							<div class="consumes-row-inputs">
+								<div class="consumes-prepot"></div>
 								<div class="consumes-potions"></div>
 								<div class="consumes-conjured"></div>
 							</div>
@@ -582,6 +597,20 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 		] as Array<StatOption<IconInputConfig<Player<any>, any>>>);
 		otherBuffOptions.forEach(iconInput => makeIconInput(buffsSection, iconInput));
 
+		const revitalizeBuffOptions = this.splitRelevantOptions([
+			{ item: IconInputs.RevitalizeRejuvination, stats: [] },
+			{ item: IconInputs.RevitalizeWildGrowth, stats: [] },
+		] as Array<StatOption<IconPickerConfig<Player<any>, any>>>);
+		if (revitalizeBuffOptions.length > 0) {
+			new MultiIconPicker(buffsSection, this.player, {
+				inputs: revitalizeBuffOptions,
+				numColumns: 1,
+				emptyColor: 'grey',
+				label: 'Revitalize',
+				categoryId: ActionId.fromSpellId(48545),
+			}, this);
+		}
+
 		const miscBuffOptions = this.splitRelevantOptions([
 			{ item: IconInputs.HeroicPresence, stats: [Stat.StatMeleeHit, Stat.StatSpellHit] },
 			{ item: IconInputs.BraidedEterniumChain, stats: [Stat.StatMeleeCrit] },
@@ -644,6 +673,22 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 			}, this);
 		}
 
+		const prepopPotionOptions = this.splitRelevantOptions([
+			// This list is smaller because some potions don't make sense to use as prepot.
+			// E.g. healing/mana potions.
+			{ item: Potions.IndestructiblePotion, stats: [Stat.StatArmor] },
+			{ item: Potions.PotionOfSpeed, stats: [Stat.StatMeleeHaste, Stat.StatSpellHaste] },
+			{ item: Potions.PotionOfWildMagic, stats: [Stat.StatMeleeCrit, Stat.StatSpellCrit, Stat.StatSpellPower] },
+		]);
+		if (prepopPotionOptions.length) {
+			const elem = this.rootElem.getElementsByClassName('consumes-prepot')[0] as HTMLElement;
+			new IconEnumPicker(elem, this.player, IconInputs.makePrepopPotionsInput(prepopPotionOptions));
+			tippy(elem, {
+				'content': 'Prepop Potion (1s before combat)',
+				'allowHTML': true,
+			});
+		}
+
 		const potionOptions = this.splitRelevantOptions([
 			{ item: Potions.RunicHealingPotion, stats: [Stat.StatStamina] },
 			{ item: Potions.RunicManaPotion, stats: [Stat.StatIntellect] },
@@ -654,9 +699,14 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 		if (potionOptions.length) {
 			const elem = this.rootElem.getElementsByClassName('consumes-potions')[0] as HTMLElement;
 			new IconEnumPicker(elem, this.player, IconInputs.makePotionsInput(potionOptions));
+			tippy(elem, {
+				'content': 'Combat Potion',
+				'allowHTML': true,
+			});
 		}
 
 		const conjuredOptions = this.splitRelevantOptions([
+			this.player.getClass() == Class.ClassRogue ? { item: Conjured.ConjuredRogueThistleTea, stats: [] } : null,
 			{ item: Conjured.ConjuredHealthstone, stats: [Stat.StatStamina] },
 			{ item: Conjured.ConjuredDarkRune, stats: [Stat.StatIntellect] },
 			{ item: Conjured.ConjuredFlameCap, stats: [Stat.StatStrength, Stat.StatAgility, Stat.StatFireSpellPower] },
@@ -1195,15 +1245,16 @@ export abstract class IndividualSimUI<SpecType extends Spec> extends SimUI {
 		});
 	}
 
-	splitRelevantOptions<T>(options: Array<StatOption<T>>): Array<T> {
+	splitRelevantOptions<T>(options: Array<StatOption<T> | null>): Array<T> {
 		return options
+			.filter(option => option != null)
 			.filter(option =>
-				this.individualConfig.includeBuffDebuffInputs.includes(option.item) ||
-				option.stats.length == 0 ||
-				option.stats.some(stat => this.individualConfig.epStats.includes(stat)))
+				this.individualConfig.includeBuffDebuffInputs.includes(option!.item) ||
+				option!.stats.length == 0 ||
+				option!.stats.some(stat => this.individualConfig.epStats.includes(stat)))
 			.filter(option =>
-				!this.individualConfig.excludeBuffDebuffInputs.includes(option.item))
-			.map(option => option.item);
+				!this.individualConfig.excludeBuffDebuffInputs.includes(option!.item))
+			.map(option => option!.item);
 	}
 }
 

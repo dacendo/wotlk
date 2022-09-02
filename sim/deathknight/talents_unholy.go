@@ -8,6 +8,7 @@ import (
 
 	"github.com/wowsims/wotlk/sim/core"
 	//"github.com/wowsims/wotlk/sim/core/proto"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
@@ -18,7 +19,7 @@ func (dk *Deathknight) ApplyUnholyTalents() {
 	// Ravenous Dead
 	if dk.Talents.RavenousDead > 0 {
 		strengthCoeff := 0.01 * float64(dk.Talents.RavenousDead)
-		dk.AddStatDependency(stats.Strength, stats.Strength, 1.0+strengthCoeff)
+		dk.MultiplyStat(stats.Strength, 1.0+strengthCoeff)
 	}
 
 	// Necrosis
@@ -88,7 +89,7 @@ func (dk *Deathknight) applyWanderingPlague() {
 		SpellSchool: core.SpellSchoolShadow,
 		Flags:       core.SpellFlagIgnoreAttackerModifiers | core.SpellFlagIgnoreTargetModifiers,
 
-		ApplyEffects: core.ApplyEffectFuncAOEDamage(dk.Env, core.SpellEffect{
+		ApplyEffects: core.ApplyEffectFuncAOEDamageCapped(dk.Env, core.SpellEffect{
 			ProcMask: core.ProcMaskSpellDamage,
 
 			DamageMultiplier: wanderingPlagueMultiplier,
@@ -196,7 +197,7 @@ func (dk *Deathknight) bloodCakedBladeHit(isMh bool) *core.Spell {
 
 			BaseDamage: core.BaseDamageConfig{
 				Calculator: func(sim *core.Simulation, spellEffect *core.SpellEffect, spell *core.Spell) float64 {
-					diseaseMultiplier := (0.25 + dk.countActiveDiseases(spellEffect.Target)*0.125)
+					diseaseMultiplier := (0.25 + dk.dkCountActiveDiseases(spellEffect.Target)*0.125)
 					if isMh {
 						return mhBaseDamage(sim, spellEffect, spell) * diseaseMultiplier
 					} else {
@@ -292,6 +293,8 @@ func (dk *Deathknight) applyUnholyBlight() {
 		return
 	}
 
+	glyphDmgBonus := core.TernaryFloat64(dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfUnholyBlight), 1.4, 1.0)
+
 	actionID := core.ActionID{SpellID: 50536}
 
 	dk.UnholyBlightSpell = dk.Unit.RegisterSpell(core.SpellConfig{
@@ -324,7 +327,7 @@ func (dk *Deathknight) applyUnholyBlight() {
 				IsPeriodic:       true,
 				BaseDamage: core.BaseDamageConfig{
 					Calculator: func(_ *core.Simulation, se *core.SpellEffect, _ *core.Spell) float64 {
-						return dk.UnholyBlightTickDamage[se.Target.Index]
+						return dk.UnholyBlightTickDamage[se.Target.Index] * glyphDmgBonus
 					},
 				},
 				OutcomeApplier: dk.OutcomeFuncTick(),

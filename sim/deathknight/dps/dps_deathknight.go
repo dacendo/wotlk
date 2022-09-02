@@ -26,6 +26,7 @@ func RegisterDpsDeathknight() {
 type DpsDeathknight struct {
 	*deathknight.Deathknight
 
+	sr SharedRotation
 	fr FrostRotation
 	ur UnholyRotation
 
@@ -46,10 +47,27 @@ func NewDpsDeathknight(character core.Character, player proto.Player) *DpsDeathk
 			RefreshHornOfWinter: dk.Rotation.RefreshHornOfWinter,
 			ArmyOfTheDeadType:   dk.Rotation.ArmyOfTheDead,
 			StartingPresence:    dk.Rotation.StartingPresence,
+			UseAMS:              dk.Rotation.UseAms,
+			AvgAMSSuccessRate:   dk.Rotation.AvgAmsSuccessRate,
+			AvgAMSHit:           dk.Rotation.AvgAmsHit,
 		}),
 		Rotation: *dk.Rotation,
 	}
 
+	dpsDk.EnableAutoAttacks(dpsDk, core.AutoAttackOptions{
+		MainHand:       dpsDk.WeaponFromMainHand(dpsDk.DefaultMeleeCritMultiplier()),
+		OffHand:        dpsDk.WeaponFromOffHand(dpsDk.DefaultMeleeCritMultiplier()),
+		AutoSwingMelee: true,
+		ReplaceMHSwing: func(sim *core.Simulation, mhSwingSpell *core.Spell) *core.Spell {
+			if dpsDk.RuneStrike.CanCast(sim) {
+				return dpsDk.RuneStrike.Spell
+			} else {
+				return nil
+			}
+		},
+	})
+
+	dpsDk.sr.dk = dpsDk
 	dpsDk.ur.dk = dpsDk
 
 	return dpsDk
@@ -65,9 +83,9 @@ func (dk *DpsDeathknight) FrostPointsInUnholy() int32 {
 
 func (dk *DpsDeathknight) SetupRotations() {
 	dk.ur.ffFirst = dk.Rotation.FirstDisease == proto.Deathknight_Rotation_FrostFever
+	dk.ur.hasGod = dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDisease)
 
-	dk.Opener.Clear()
-	dk.Main.Clear()
+	dk.RotationSequence.Clear()
 
 	if dk.Talents.HowlingBlast && (dk.FrostPointsInBlood() > dk.FrostPointsInUnholy()) {
 		if dk.Rotation.UseEmpowerRuneWeapon {
@@ -75,21 +93,22 @@ func (dk *DpsDeathknight) SetupRotations() {
 		} else {
 			dk.setupFrostSubBloodNoERWOpener()
 		}
-	} else if dk.Talents.HowlingBlast && (dk.FrostPointsInBlood() < dk.FrostPointsInUnholy()) {
+	} else if dk.Talents.HowlingBlast && (dk.FrostPointsInBlood() <= dk.FrostPointsInUnholy()) {
 		if dk.Rotation.UseEmpowerRuneWeapon {
 			dk.setupFrostSubUnholyERWOpener()
 		} else {
-			dk.setupFrostSubUnholyNoERWOpener()
+			dk.setupFrostSubUnholyERWOpener()
 		}
 	} else if dk.Talents.SummonGargoyle {
 		dk.setupUnholyRotations()
+	} else if dk.Talents.DancingRuneWeapon {
+		dk.setupBloodRotations()
 	} else {
 		// TODO: Add some default rotation that works without special talents
-		if dk.Rotation.UseEmpowerRuneWeapon {
-			dk.setupFrostSubBloodERWOpener()
-		} else {
-			dk.setupFrostSubBloodNoERWOpener()
-		}
+		dk.RotationSequence.Clear().
+			NewAction(dk.RotationActionCallback_IT).
+			NewAction(dk.RotationActionCallback_PS).
+			NewAction(dk.RotationActionCallback_BS)
 	}
 }
 
@@ -114,6 +133,7 @@ func (dk *DpsDeathknight) Reset(sim *core.Simulation) {
 		dk.ChangePresence(sim, deathknight.BloodPresence)
 	}
 
+	dk.sr.Reset(sim)
 	dk.fr.Reset(sim)
 	dk.ur.Reset(sim)
 

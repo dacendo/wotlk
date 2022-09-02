@@ -424,14 +424,16 @@ func init() {
 			oldOnGain := aura.OnGain
 			oldOnExpire := aura.OnExpire
 
+			statDep := character.NewDynamicMultiplyStat(stats.Strength, 1.15)
+
 			aura.OnGain = func(aura *core.Aura, sim *core.Simulation) {
 				oldOnGain(aura, sim)
-				aura.Unit.AddStatDependencyDynamic(sim, stats.Strength, stats.Strength, 1.15)
+				aura.Unit.EnableDynamicStatDep(sim, statDep)
 			}
 
 			aura.OnExpire = func(aura *core.Aura, sim *core.Simulation) {
 				oldOnExpire(aura, sim)
-				aura.Unit.AddStatDependencyDynamic(sim, stats.Strength, stats.Strength, 1.0/1.15)
+				aura.Unit.DisableDynamicStatDep(sim, statDep)
 			}
 		})
 	}
@@ -482,6 +484,34 @@ func init() {
 				}
 			},
 		})
+	})
+
+	core.NewItemEffect(70164, func(agent core.Agent) {
+		character := agent.GetCharacter()
+		mh := character.Equip[proto.ItemSlot_ItemSlotMainHand].Enchant.ID == 70164
+		oh := character.Equip[proto.ItemSlot_ItemSlotOffHand].Enchant.ID == 70164
+		if !mh && !oh {
+			return
+		}
+
+		character.AddStat(stats.Defense, 13)
+		character.MultiplyStat(stats.Stamina, 1.01)
+	})
+
+	core.NewItemEffect(62158, func(agent core.Agent) {
+		character := agent.GetCharacter()
+		mh := character.Equip[proto.ItemSlot_ItemSlotMainHand].Enchant.ID == 62158
+		oh := character.Equip[proto.ItemSlot_ItemSlotOffHand].Enchant.ID == 62158
+		if !mh {
+			return
+		}
+
+		if oh {
+			return
+		}
+
+		character.AddStat(stats.Defense, 25)
+		character.MultiplyStat(stats.Stamina, 1.02)
 	})
 
 	core.NewItemEffect(55642, func(agent core.Agent) {

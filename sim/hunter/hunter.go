@@ -1,6 +1,8 @@
 package hunter
 
 import (
+	"time"
+
 	"github.com/wowsims/wotlk/sim/common"
 	"github.com/wowsims/wotlk/sim/core"
 	"github.com/wowsims/wotlk/sim/core/proto"
@@ -35,8 +37,9 @@ type Hunter struct {
 
 	pet *HunterPet
 
-	AmmoDPS         float64
-	AmmoDamageBonus float64
+	AmmoDPS                   float64
+	AmmoDamageBonus           float64
+	NormalizedAmmoDamageBonus float64
 
 	currentAspect *core.Aura
 
@@ -45,6 +48,9 @@ type Hunter struct {
 	permaHawk                           bool
 
 	serpentStingDamageMultiplier float64
+
+	// The most recent time at which moving could have started, for trap weaving.
+	mayMoveAt time.Duration
 
 	AspectOfTheDragonhawk *core.Spell
 	AspectOfTheViper      *core.Spell
@@ -78,6 +84,7 @@ type Hunter struct {
 	AspectOfTheViperAura      *core.Aura
 	ImprovedSteadyShotAura    *core.Aura
 	LockAndLoadAura           *core.Aura
+	RapidFireAura             *core.Aura
 	ScorpidStingAura          *core.Aura
 	TalonOfAlarAura           *core.Aura
 
@@ -114,7 +121,7 @@ func (hunter *Hunter) Initialize() {
 	// Update auto crit multipliers now that we have the targets.
 	hunter.AutoAttacks.MHEffect.OutcomeApplier = hunter.OutcomeFuncMeleeWhite(hunter.critMultiplier(false, false, hunter.CurrentTarget))
 	hunter.AutoAttacks.OHEffect.OutcomeApplier = hunter.OutcomeFuncMeleeWhite(hunter.critMultiplier(false, false, hunter.CurrentTarget))
-	hunter.AutoAttacks.RangedEffect.OutcomeApplier = hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(true, false, hunter.CurrentTarget))
+	hunter.AutoAttacks.RangedEffect.OutcomeApplier = hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(false, false, hunter.CurrentTarget))
 
 	hunter.registerAspectOfTheDragonhawkSpell()
 	hunter.registerAspectOfTheViperSpell()
@@ -150,6 +157,7 @@ func (hunter *Hunter) Initialize() {
 }
 
 func (hunter *Hunter) Reset(sim *core.Simulation) {
+	hunter.mayMoveAt = 0
 	hunter.manaSpentPerSecondAtFirstAspectSwap = 0
 	hunter.permaHawk = false
 
@@ -196,6 +204,7 @@ func NewHunter(character core.Character, options proto.Player) *Hunter {
 			hunter.AmmoDPS = 32
 		}
 		hunter.AmmoDamageBonus = hunter.AmmoDPS * rangedWeapon.SwingSpeed
+		hunter.NormalizedAmmoDamageBonus = hunter.AmmoDPS * 2.8
 	}
 
 	hunter.EnableAutoAttacks(hunter, core.AutoAttackOptions{
@@ -213,10 +222,10 @@ func NewHunter(character core.Character, options proto.Player) *Hunter {
 
 	hunter.pet = hunter.NewHunterPet()
 
-	hunter.AddStatDependency(stats.Strength, stats.AttackPower, 1.0+1)
-	hunter.AddStatDependency(stats.Agility, stats.AttackPower, 1.0+1)
-	hunter.AddStatDependency(stats.Agility, stats.RangedAttackPower, 1.0+1)
-	hunter.AddStatDependency(stats.Agility, stats.MeleeCrit, 1.0+(core.CritRatingPerCritChance/83.33))
+	hunter.AddStatDependency(stats.Strength, stats.AttackPower, 1)
+	hunter.AddStatDependency(stats.Agility, stats.AttackPower, 1)
+	hunter.AddStatDependency(stats.Agility, stats.RangedAttackPower, 1)
+	hunter.AddStatDependency(stats.Agility, stats.MeleeCrit, core.CritRatingPerCritChance/83.33)
 
 	return hunter
 }

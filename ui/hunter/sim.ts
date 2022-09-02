@@ -97,6 +97,7 @@ export class HunterSimUI extends IndividualSimUI<Spec.SpecHunter> {
 
 			// All stats for which EP should be calculated.
 			epStats: [
+				Stat.StatStamina,
 				Stat.StatIntellect,
 				Stat.StatAgility,
 				Stat.StatStrength,
@@ -212,7 +213,6 @@ export class HunterSimUI extends IndividualSimUI<Spec.SpecHunter> {
 				inputs: [
 					HunterInputs.PetUptime,
 					HunterInputs.SniperTrainingUptime,
-					OtherInputs.PrepopPotion,
 					OtherInputs.TankAssignment,
 					OtherInputs.InFrontOfTarget,
 				],

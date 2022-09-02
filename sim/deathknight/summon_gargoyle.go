@@ -61,22 +61,11 @@ func (dk *Deathknight) registerSummonGargoyleCD() {
 			}
 			sim.AddPendingAction(&pa)
 		},
+	}, func(sim *core.Simulation) bool {
+		return dk.CastCostPossible(sim, 60.0, 0, 0, 0) && dk.SummonGargoyle.IsReady(sim)
+	}, func(sim *core.Simulation) {
+		dk.UpdateMajorCooldowns()
 	})
-}
-
-func (dk *Deathknight) CanSummonGargoyle(sim *core.Simulation) bool {
-	return dk.CastCostPossible(sim, 60.0, 0, 0, 0) && dk.SummonGargoyle.IsReady(sim)
-}
-
-func (dk *Deathknight) CastSummonGargoyle(sim *core.Simulation, target *core.Unit) bool {
-	if dk.CanSummonGargoyle(sim) {
-		res := dk.SummonGargoyle.Cast(sim, target)
-		if res {
-			dk.UpdateMajorCooldowns()
-		}
-		return res
-	}
-	return false
 }
 
 type GargoylePet struct {
@@ -93,7 +82,13 @@ func (dk *Deathknight) NewGargoyle() *GargoylePet {
 			"Gargoyle",
 			&dk.Character,
 			gargoyleBaseStats,
-			gargoyleStatInheritance,
+			func(ownerStats stats.Stats) stats.Stats {
+				return stats.Stats{
+					stats.AttackPower: ownerStats[stats.AttackPower],
+					stats.SpellHit:    ownerStats[stats.SpellHit],
+					stats.SpellHaste:  (ownerStats[stats.MeleeHaste] / dk.PseudoStats.MeleeHasteRatingPerHastePercent) * core.HasteRatingPerHastePercent,
+				}
+			},
 			false,
 			true,
 		),
@@ -128,14 +123,6 @@ func (garg *GargoylePet) OnGCDReady(sim *core.Simulation) {
 // These numbers are just rough guesses
 var gargoyleBaseStats = stats.Stats{
 	stats.Stamina: 1000,
-}
-
-var gargoyleStatInheritance = func(ownerStats stats.Stats) stats.Stats {
-	return stats.Stats{
-		stats.AttackPower: ownerStats[stats.AttackPower],
-		stats.SpellHit:    ownerStats[stats.SpellHit],
-		stats.SpellHaste:  ownerStats[stats.MeleeHaste],
-	}
 }
 
 func (garg *GargoylePet) registerGargoyleStrikeSpell() {

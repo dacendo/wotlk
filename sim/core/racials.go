@@ -17,7 +17,45 @@ func applyRaceEffects(agent Agent) {
 		character.PseudoStats.ReducedFrostHitTakenChance += 0.02
 		character.PseudoStats.ReducedNatureHitTakenChance += 0.02
 		character.PseudoStats.ReducedShadowHitTakenChance += 0.02
-		// TODO: Add major cooldown: arcane torrent
+
+		actionID := ActionID{SpellID: 50613}
+
+		var resourceMetrics *ResourceMetrics = nil
+		spell := character.RegisterSpell(SpellConfig{
+			ActionID: actionID,
+			Flags:    SpellFlagNoOnCastComplete,
+			Cast: CastConfig{
+				CD: Cooldown{
+					Timer:    character.NewTimer(),
+					Duration: time.Minute * 2,
+				},
+			},
+			ApplyEffects: func(sim *Simulation, unit *Unit, spell *Spell) {
+				if resourceMetrics == nil {
+					if character.HasRunicPowerBar() {
+						resourceMetrics = character.NewRunicPowerMetrics(actionID)
+					} else if character.HasEnergyBar() {
+						resourceMetrics = character.NewEnergyMetrics(actionID)
+					} else if character.HasManaBar() {
+						resourceMetrics = character.NewManaMetrics(actionID)
+					}
+				}
+
+				if spell.Unit.HasRunicPowerBar() {
+					spell.Unit.AddRunicPower(sim, 15.0, resourceMetrics)
+				} else if spell.Unit.HasEnergyBar() {
+					spell.Unit.AddEnergy(sim, 15.0, resourceMetrics)
+				} else if unit.HasManaBar() {
+					spell.Unit.AddMana(sim, unit.MaxMana()*0.06, resourceMetrics, false)
+				}
+			},
+		})
+
+		character.AddMajorCooldown(MajorCooldown{
+			Spell:    spell,
+			Type:     CooldownTypeDPS,
+			Priority: CooldownPriorityLow,
+		})
 	case proto.Race_RaceDraenei:
 		character.PseudoStats.ReducedShadowHitTakenChance += 0.02
 		// TODO: Gift of the naaru for healers
@@ -36,20 +74,21 @@ func applyRaceEffects(agent Agent) {
 			5*ExpertisePerQuarterPercentReduction,
 			[]proto.WeaponType{proto.WeaponType_WeaponTypeMace})
 
-		// TODO: Stoneform
 		actionID := ActionID{SpellID: 20594}
+
+		statDep := character.NewDynamicMultiplyStat(stats.Armor, 1.1)
 		stoneFormAura := character.NewTemporaryStatsAuraWrapped("Stoneform", actionID, stats.Stats{}, time.Second*8, func(aura *Aura) {
 			oldOnGain := aura.OnGain
 			oldOnExpire := aura.OnExpire
 
 			aura.OnGain = func(aura *Aura, sim *Simulation) {
 				oldOnGain(aura, sim)
-				aura.Unit.AddStatDependencyDynamic(sim, stats.Armor, stats.Armor, 1.1)
+				aura.Unit.EnableDynamicStatDep(sim, statDep)
 			}
 
 			aura.OnExpire = func(aura *Aura, sim *Simulation) {
 				oldOnExpire(aura, sim)
-				aura.Unit.AddStatDependencyDynamic(sim, stats.Armor, stats.Armor, 1.0/1.1)
+				aura.Unit.DisableDynamicStatDep(sim, statDep)
 			}
 		})
 
@@ -73,9 +112,9 @@ func applyRaceEffects(agent Agent) {
 		})
 	case proto.Race_RaceGnome:
 		character.PseudoStats.ReducedArcaneHitTakenChance += 0.02
-		character.AddStatDependency(stats.Intellect, stats.Intellect, 1.0+0.05)
+		character.MultiplyStat(stats.Intellect, 1.05)
 	case proto.Race_RaceHuman:
-		character.AddStatDependency(stats.Spirit, stats.Spirit, 1.0+0.03)
+		character.MultiplyStat(stats.Spirit, 1.03)
 		applyWeaponSpecialization(
 			character,
 			3*ExpertisePerQuarterPercentReduction,

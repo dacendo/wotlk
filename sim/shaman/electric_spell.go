@@ -23,7 +23,9 @@ const (
 )
 
 const (
-	CastTagLightningOverload int32 = 1 // This could be value or bitflag if we ended up needing multiple flags at the same time.
+	// This could be value or bitflag if we ended up needing multiple flags at the same time.
+	//1 to 5 are used by MaelstromWeapon Stacks
+	CastTagLightningOverload int32 = 6
 )
 
 // Mana cost numbers based on in-game testing:
@@ -39,7 +41,7 @@ func (shaman *Shaman) newElectricSpellConfig(actionID core.ActionID, baseCost fl
 	spell := core.SpellConfig{
 		ActionID:     actionID,
 		SpellSchool:  core.SpellSchoolNature,
-		Flags:        SpellFlagElectric,
+		Flags:        SpellFlagElectric | SpellFlagFocusable,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
