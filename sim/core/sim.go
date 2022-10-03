@@ -153,6 +153,12 @@ func (sim *Simulation) RandomFloat(label string) float64 {
 	return v
 }
 
+// Shorthand for commonly-used RNG behavior.
+// Returns a random number between min and max.
+func (sim *Simulation) Roll(min float64, max float64) float64 {
+	return min + (max-min)*sim.RandomFloat("Damage Roll")
+}
+
 func (sim *Simulation) Reset() {
 	sim.reset()
 }
@@ -245,7 +251,7 @@ func (sim *Simulation) run() *proto.RaidSimResult {
 		// fmt.Printf("Iteration: %d\n", i)
 		if sim.ProgressReport != nil && time.Since(st) > time.Millisecond*100 {
 			metrics := sim.Raid.GetMetrics(i + 1)
-			sim.ProgressReport(&proto.ProgressMetrics{TotalIterations: sim.Options.Iterations, CompletedIterations: i + 1, Dps: metrics.Dps.Avg})
+			sim.ProgressReport(&proto.ProgressMetrics{TotalIterations: sim.Options.Iterations, CompletedIterations: i + 1, Dps: metrics.Dps.Avg, Hps: metrics.Hps.Avg})
 			runtime.Gosched() // ensure that reporting threads are given time to report, mostly only important in wasm (only 1 thread)
 			st = time.Now()
 		}
@@ -315,10 +321,10 @@ func (sim *Simulation) runOnce() {
 	sim.Encounter.doneIteration(sim)
 
 	for _, unit := range sim.Raid.AllUnits {
-		unit.Metrics.doneIteration(sim.rand.GetSeed(), sim.CurrentTime.Seconds())
+		unit.Metrics.doneIteration(unit, sim.rand.GetSeed(), sim.CurrentTime.Seconds())
 	}
 	for _, target := range sim.Encounter.Targets {
-		target.Metrics.doneIteration(sim.rand.GetSeed(), sim.CurrentTime.Seconds())
+		target.Metrics.doneIteration(&target.Unit, sim.rand.GetSeed(), sim.CurrentTime.Seconds())
 	}
 }
 

@@ -20,14 +20,13 @@ func (druid *Druid) registerStarfallSpell() {
 	numberOfTicks := core.TernaryInt(druid.Env.GetNumTargets() > 1, 20, 10)
 	tickLength := core.TernaryDuration(druid.Env.GetNumTargets() > 1, time.Millisecond*500, time.Millisecond*1000)
 
-	// Improved Faerie Fire and Nature's Majesty
-	iffCritBonus := core.TernaryFloat64(druid.CurrentTarget.HasAura("Improved Faerie Fire"), druid.TalentsBonuses.iffBonusCrit, 0)
+	// Nature's Majesty
 	naturesMajestyCritBonus := druid.TalentsBonuses.naturesMajestyBonusCrit
 
 	druid.Starfall = druid.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 53201},
-		SpellSchool: core.SpellSchoolArcane,
-
+		ActionID:     core.ActionID{SpellID: 53201},
+		SpellSchool:  core.SpellSchoolArcane,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -42,8 +41,12 @@ func (druid *Druid) registerStarfallSpell() {
 			},
 		},
 
+		BonusCritRating:  naturesMajestyCritBonus,
+		DamageMultiplier: 1 * (1 + core.TernaryFloat64(druid.HasMajorGlyph(proto.DruidMajorGlyph_GlyphOfFocus), 0.1, 0)),
+		CritMultiplier:   druid.SpellCritMultiplier(1, druid.TalentsBonuses.vengeanceModifier),
+		ThreatMultiplier: 1,
+
 		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:       core.ProcMaskSpellDamage,
 			OutcomeApplier: druid.OutcomeFuncMagicHit(),
 			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				if spellEffect.Landed() {
@@ -55,7 +58,12 @@ func (druid *Druid) registerStarfallSpell() {
 	})
 
 	druid.StarfallSplash = druid.RegisterSpell(core.SpellConfig{
-		ActionID: core.ActionID{SpellID: 53190},
+		ActionID:         core.ActionID{SpellID: 53190},
+		ProcMask:         core.ProcMaskSpellDamage,
+		BonusCritRating:  naturesMajestyCritBonus,
+		DamageMultiplier: 1 * (1 + core.TernaryFloat64(druid.HasMajorGlyph(proto.DruidMajorGlyph_GlyphOfFocus), 0.1, 0)),
+		CritMultiplier:   druid.SpellCritMultiplier(1, druid.TalentsBonuses.vengeanceModifier),
+		ThreatMultiplier: 1,
 	})
 
 	druid.StarfallDot = core.NewDot(core.Dot{
@@ -66,15 +74,10 @@ func (druid *Druid) registerStarfallSpell() {
 		}),
 		NumberOfTicks: numberOfTicks,
 		TickLength:    tickLength,
-		TickEffects: core.TickFuncApplyEffects(core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskPeriodicDamage,
-			DamageMultiplier: 1 * (1 + core.TernaryFloat64(druid.HasMajorGlyph(proto.DruidMajorGlyph_GlyphOfFocus), 0.1, 0)),
-			ThreatMultiplier: 1,
-			IsPeriodic:       false,
-			BaseDamage:       core.BaseDamageConfigMagic(563, 653, 0.3),
-			OutcomeApplier:   druid.OutcomeFuncMagicHitAndCrit(druid.SpellCritMultiplier(1, druid.TalentsBonuses.vengeanceModifier)),
-			BonusCritRating:  iffCritBonus + naturesMajestyCritBonus,
-		})),
+		TickEffects: core.TickFuncApplyEffects(func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := sim.Roll(563, 653) + 0.3*spell.SpellPower()
+			spell.CalcAndDealDamageMagicHitAndCrit(sim, target, baseDamage)
+		}),
 	})
 
 	druid.StarfallDotSplash = core.NewDot(core.Dot{
@@ -85,14 +88,12 @@ func (druid *Druid) registerStarfallSpell() {
 		}),
 		NumberOfTicks: numberOfTicks,
 		TickLength:    tickLength,
-		TickEffects: core.TickFuncApplyEffects(core.ApplyEffectFuncAOEDamageCapped(druid.Env, core.SpellEffect{
-			ProcMask:         core.ProcMaskPeriodicDamage,
-			DamageMultiplier: 1 * (1 + core.TernaryFloat64(druid.HasMajorGlyph(proto.DruidMajorGlyph_GlyphOfFocus), 0.1, 0)),
-			ThreatMultiplier: 1,
-			IsPeriodic:       false,
-			BaseDamage:       core.BaseDamageConfigMagicNoRoll(101, 0.13),
-			OutcomeApplier:   druid.OutcomeFuncMagicHitAndCrit(druid.SpellCritMultiplier(1, druid.TalentsBonuses.vengeanceModifier)),
-			BonusCritRating:  iffCritBonus + naturesMajestyCritBonus,
-		})),
+		TickEffects: core.TickFuncApplyEffects(func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := 101 + 0.13*spell.SpellPower()
+			baseDamage *= sim.Encounter.AOECapMultiplier()
+			for _, aoeTarget := range sim.Encounter.Targets {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, &aoeTarget.Unit, baseDamage)
+			}
+		}),
 	})
 }

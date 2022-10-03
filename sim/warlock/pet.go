@@ -55,6 +55,8 @@ func (warlock *Warlock) NewWarlockPet() *WarlockPet {
 	}
 
 	wp.EnableManaBarWithModifier(petConfig.PowerModifier)
+	wp.EnableResumeAfterManaWait(wp.OnGCDReady)
+
 	wp.AddStatDependency(stats.Strength, stats.AttackPower, 2)
 	wp.AddStat(stats.AttackPower, -20)
 
@@ -117,30 +119,51 @@ func (warlock *Warlock) NewWarlockPet() *WarlockPet {
 	}
 	// wp.AutoAttacks.MHEffect.DamageMultiplier *= petConfig.DamageMultiplier
 	switch summonChoice {
-	case proto.Warlock_Options_Imp:
-		wp.PseudoStats.FireDamageDealtMultiplier *= 1.0 + 0.01*float64(warlock.Talents.MasterDemonologist)
-		wp.PseudoStats.BonusFireCritRating *= 1.0 + 0.01*float64(warlock.Talents.MasterDemonologist)
-	case proto.Warlock_Options_Succubus:
-		wp.PseudoStats.ShadowDamageDealtMultiplier *= 1.0 + 0.01*float64(warlock.Talents.MasterDemonologist)
-		wp.PseudoStats.BonusShadowCritRating *= 1.0 + 0.01*float64(warlock.Talents.MasterDemonologist)
 	case proto.Warlock_Options_Felguard:
-		wp.PseudoStats.DamageDealtMultiplier *= 1.0 + 0.01*float64(warlock.Talents.MasterDemonologist)
-		// Simulates a pre-stacked demonic frenzy
-		multiplier := 1.5 + 0.1*float64(warlock.Talents.DemonicBrutality)
 		if wp.owner.HasMajorGlyph(proto.WarlockMajorGlyph_GlyphOfFelguard) {
-			multiplier *= 1.2
+			wp.MultiplyStat(stats.AttackPower, 1.2)
 		}
-		wp.MultiplyStat(stats.AttackPower, multiplier)
+
+		statDeps := []*stats.StatDependency{nil}
+		for i := 1; i <= 10; i++ {
+			statDeps = append(statDeps, wp.NewDynamicMultiplyStat(stats.AttackPower,
+				1+float64(i)*(0.05+0.01*float64(warlock.Talents.DemonicBrutality))))
+		}
+
+		DemonicFrenzyAura := wp.RegisterAura(core.Aura{
+			Label:     "Demonic Frenzy",
+			ActionID:  core.ActionID{SpellID: 32851},
+			Duration:  time.Second * 10,
+			MaxStacks: 10,
+			OnStacksChange: func(aura *core.Aura, sim *core.Simulation, oldStacks int32, newStacks int32) {
+				if oldStacks != 0 {
+					aura.Unit.DisableDynamicStatDep(sim, statDeps[oldStacks])
+				}
+				if newStacks != 0 {
+					aura.Unit.EnableDynamicStatDep(sim, statDeps[newStacks])
+				}
+			},
+		})
+		wp.RegisterAura(core.Aura{
+			Label:    "Demonic Frenzy Hidden Aura",
+			Duration: core.NeverExpires,
+			OnReset: func(aura *core.Aura, sim *core.Simulation) {
+				aura.Activate(sim)
+			},
+			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMelee) {
+					return
+				}
+				DemonicFrenzyAura.Activate(sim)
+				DemonicFrenzyAura.AddStack(sim)
+			},
+		})
 	}
 
 	if warlock.Talents.FelVitality > 0 {
 		bonus := 1.0 + 0.05*float64(warlock.Talents.FelVitality)
 		wp.MultiplyStat(stats.Intellect, bonus)
 		wp.MultiplyStat(stats.Stamina, bonus)
-	}
-
-	if warlock.HasSetBonus(ItemSetOblivionRaiment, 2) {
-		wp.AddStat(stats.MP5, 45)
 	}
 
 	core.ApplyPetConsumeEffects(&wp.Character, warlock.Consumes)
@@ -194,17 +217,14 @@ func (warlock *Warlock) makeStatInheritance() core.PetStatInheritance {
 
 	return func(ownerStats stats.Stats) stats.Stats {
 		ownerHitChance := math.Floor(ownerStats[stats.SpellHit] / core.SpellHitRatingPerHitChance)
-		highestSP := core.MaxFloat(ownerStats[stats.ArcaneSpellPower],
-			core.MaxFloat(ownerStats[stats.FireSpellPower], core.MaxFloat(ownerStats[stats.FrostSpellPower],
-				core.MaxFloat(ownerStats[stats.HolySpellPower], core.MaxFloat(ownerStats[stats.NatureSpellPower],
-					ownerStats[stats.ShadowSpellPower])))))
 
+		// TODO: Account for sunfire/soulfrost
 		return stats.Stats{
 			stats.Stamina:          ownerStats[stats.Stamina] * 0.75,
 			stats.Intellect:        ownerStats[stats.Intellect] * 0.3,
 			stats.Armor:            ownerStats[stats.Armor] * 0.35,
-			stats.AttackPower:      (ownerStats[stats.SpellPower] + highestSP) * 0.57,
-			stats.SpellPower:       (ownerStats[stats.SpellPower] + highestSP) * 0.15,
+			stats.AttackPower:      ownerStats[stats.SpellPower] * 0.57,
+			stats.SpellPower:       ownerStats[stats.SpellPower] * 0.15,
 			stats.SpellPenetration: ownerStats[stats.SpellPenetration],
 			stats.SpellCrit:        improvedDemonicTactics * 0.1 * ownerStats[stats.SpellCrit],
 			stats.MeleeCrit:        improvedDemonicTactics * 0.1 * ownerStats[stats.SpellCrit],

@@ -32,24 +32,29 @@ type CapacitorDamageEffect struct {
 	MaxStacks int32
 	Trigger   ProcTrigger
 
-	School     core.SpellSchool
-	BaseDamage core.BaseDamageConfig
+	School core.SpellSchool
+	MinDmg float64
+	MaxDmg float64
 }
 
 func newCapacitorDamageEffect(config CapacitorDamageEffect) {
 	core.NewItemEffect(config.ID, func(agent core.Agent) {
 		character := agent.GetCharacter()
 
+		minDmg := config.MinDmg
+		maxDmg := config.MaxDmg
 		damageSpell := character.RegisterSpell(core.SpellConfig{
 			ActionID:    core.ActionID{ItemID: config.ID},
 			SpellSchool: config.School,
-			ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-				ProcMask:         core.ProcMaskEmpty,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
-				BaseDamage:       config.BaseDamage,
-				OutcomeApplier:   character.OutcomeFuncMagicHitAndCrit(character.DefaultSpellCritMultiplier()),
-			}),
+			ProcMask:    core.ProcMaskEmpty,
+
+			DamageMultiplier: 1,
+			CritMultiplier:   character.DefaultSpellCritMultiplier(),
+			ThreatMultiplier: 1,
+
+			ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, target, sim.Roll(minDmg, maxDmg))
+			},
 		})
 
 		capacitorAura := makeCapacitorAura(&character.Unit, CapacitorAura{
@@ -86,8 +91,9 @@ func init() {
 			Outcome:  core.OutcomeCrit,
 			ICD:      time.Millisecond * 2500,
 		},
-		School:     core.SpellSchoolNature,
-		BaseDamage: core.BaseDamageConfigRoll(1181, 1371),
+		School: core.SpellSchoolNature,
+		MinDmg: 1181,
+		MaxDmg: 1371,
 	})
 	newCapacitorDamageEffect(CapacitorDamageEffect{
 		Name:      "Reign of the Unliving",
@@ -99,8 +105,8 @@ func init() {
 			Outcome:  core.OutcomeCrit,
 			ICD:      time.Millisecond * 2000,
 		},
-		School:     core.SpellSchoolFire,
-		BaseDamage: core.BaseDamageConfigRoll(1741, 2023),
+		MinDmg: 1741,
+		MaxDmg: 2023,
 	})
 	newCapacitorDamageEffect(CapacitorDamageEffect{
 		Name:      "Reign of the Unliving H",
@@ -112,8 +118,9 @@ func init() {
 			Outcome:  core.OutcomeCrit,
 			ICD:      time.Millisecond * 2000,
 		},
-		School:     core.SpellSchoolFire,
-		BaseDamage: core.BaseDamageConfigRoll(1959, 2275),
+		School: core.SpellSchoolFire,
+		MinDmg: 1959,
+		MaxDmg: 2275,
 	})
 
 	core.AddEffectsToTest = true
@@ -128,8 +135,9 @@ func init() {
 			Outcome:  core.OutcomeCrit,
 			ICD:      time.Millisecond * 2000,
 		},
-		School:     core.SpellSchoolFire,
-		BaseDamage: core.BaseDamageConfigRoll(1741, 2023),
+		School: core.SpellSchoolFire,
+		MinDmg: 1741,
+		MaxDmg: 2023,
 	})
 	newCapacitorDamageEffect(CapacitorDamageEffect{
 		Name:      "Reign of the Dead H",
@@ -141,8 +149,9 @@ func init() {
 			Outcome:  core.OutcomeCrit,
 			ICD:      time.Millisecond * 2000,
 		},
-		School:     core.SpellSchoolFire,
-		BaseDamage: core.BaseDamageConfigRoll(1959, 2275),
+		School: core.SpellSchoolFire,
+		MinDmg: 1959,
+		MaxDmg: 2275,
 	})
 
 	NewItemEffectWithHeroic(func(isHeroic bool) {
@@ -164,23 +173,27 @@ func init() {
 			var mhSpell *core.Spell
 			var ohSpell *core.Spell
 			initSpells := func() {
-				mhEffect := character.AutoAttacks.MHEffect
-				mhEffect.DamageMultiplier *= 0.5
 				mhSpell = character.GetOrRegisterSpell(core.SpellConfig{
-					ActionID:     core.ActionID{ItemID: itemID}.WithTag(1),
-					SpellSchool:  core.SpellSchoolPhysical,
-					Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagNoOnCastComplete,
-					ApplyEffects: core.ApplyEffectFuncDirectDamage(mhEffect),
+					ActionID:         core.ActionID{ItemID: itemID}.WithTag(1),
+					SpellSchool:      core.SpellSchoolPhysical,
+					ProcMask:         core.ProcMaskMeleeMHAuto,
+					Flags:            core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage | core.SpellFlagNoOnCastComplete,
+					DamageMultiplier: character.AutoAttacks.MHConfig.DamageMultiplier * 0.5,
+					CritMultiplier:   character.AutoAttacks.MHConfig.CritMultiplier,
+					ThreatMultiplier: character.AutoAttacks.MHConfig.ThreatMultiplier,
+					ApplyEffects:     character.AutoAttacks.MHConfig.ApplyEffects,
 				})
 
 				if character.AutoAttacks.IsDualWielding {
-					ohEffect := character.AutoAttacks.OHEffect
-					ohEffect.DamageMultiplier *= 0.5
 					ohSpell = character.GetOrRegisterSpell(core.SpellConfig{
-						ActionID:     core.ActionID{ItemID: itemID}.WithTag(2),
-						SpellSchool:  core.SpellSchoolPhysical,
-						Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagNoOnCastComplete,
-						ApplyEffects: core.ApplyEffectFuncDirectDamage(ohEffect),
+						ActionID:         core.ActionID{ItemID: itemID}.WithTag(2),
+						SpellSchool:      core.SpellSchoolPhysical,
+						ProcMask:         core.ProcMaskMeleeOHAuto,
+						Flags:            core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage | core.SpellFlagNoOnCastComplete,
+						DamageMultiplier: character.AutoAttacks.MHConfig.DamageMultiplier * 0.5,
+						CritMultiplier:   character.AutoAttacks.OHConfig.CritMultiplier,
+						ThreatMultiplier: character.AutoAttacks.OHConfig.ThreatMultiplier,
+						ApplyEffects:     character.AutoAttacks.OHConfig.ApplyEffects,
 					})
 				}
 			}

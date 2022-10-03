@@ -58,9 +58,9 @@ func (wp *WarlockPet) newIntercept() *core.Spell {
 func (wp *WarlockPet) newFirebolt() *core.Spell {
 	baseCost := 180.0
 	return wp.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 47964},
-		SpellSchool: core.SpellSchoolFire,
-
+		ActionID:     core.ActionID{SpellID: 47964},
+		SpellSchool:  core.SpellSchoolFire,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -72,14 +72,17 @@ func (wp *WarlockPet) newFirebolt() *core.Spell {
 			},
 			IgnoreHaste: true,
 		},
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask: core.ProcMaskSpellDamage,
-			DamageMultiplier: (1.0 + 0.1*float64(wp.owner.Talents.ImprovedImp)) *
-				(1.0 + 0.2*core.TernaryFloat64(wp.owner.HasMajorGlyph(proto.WarlockMajorGlyph_GlyphOfImp), 1, 0)),
-			ThreatMultiplier: 1,
-			BaseDamage:       core.BaseDamageConfigMagic(203, 227, 0.571),
-			OutcomeApplier:   wp.OutcomeFuncMagicHitAndCrit(2),
-		}),
+
+		BonusCritRating: wp.owner.masterDemonologistFireCrit(),
+		DamageMultiplier: (1 + 0.1*float64(wp.owner.Talents.ImprovedImp)) *
+			(1 + 0.2*core.TernaryFloat64(wp.owner.HasMajorGlyph(proto.WarlockMajorGlyph_GlyphOfImp), 1, 0)),
+		CritMultiplier:   2,
+		ThreatMultiplier: 1,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := sim.Roll(203, 227) + 0.571*spell.SpellPower()
+			spell.CalcAndDealDamageMagicHitAndCrit(sim, target, baseDamage)
+		},
 	})
 }
 
@@ -87,11 +90,8 @@ func (wp *WarlockPet) newCleave() *core.Spell {
 	baseCost := 439.0 // 10% of base
 
 	baseEffect := core.SpellEffect{
-		ProcMask:         core.ProcMaskMeleeMHSpecial,
-		DamageMultiplier: 1.0,
-		ThreatMultiplier: 1,
-		BaseDamage:       core.BaseDamageConfigMeleeWeapon(core.MainHand, false, 124, 1.0, 1.0, true),
-		OutcomeApplier:   wp.OutcomeFuncMeleeSpecialHitAndCrit(2),
+		BaseDamage:     core.BaseDamageConfigMeleeWeapon(core.MainHand, false, 124, true),
+		OutcomeApplier: wp.OutcomeFuncMeleeSpecialHitAndCrit(),
 	}
 
 	numHits := core.MinInt32(2, wp.Env.GetNumTargets())
@@ -102,10 +102,10 @@ func (wp *WarlockPet) newCleave() *core.Spell {
 	}
 
 	return wp.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 47994},
-		SpellSchool: core.SpellSchoolPhysical,
-		Flags:       core.SpellFlagMeleeMetrics,
-
+		ActionID:     core.ActionID{SpellID: 47994},
+		SpellSchool:  core.SpellSchoolPhysical,
+		ProcMask:     core.ProcMaskMeleeMHSpecial,
+		Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -120,6 +120,11 @@ func (wp *WarlockPet) newCleave() *core.Spell {
 				Duration: time.Second * 6,
 			},
 		},
+
+		DamageMultiplier: 1,
+		CritMultiplier:   2,
+		ThreatMultiplier: 1,
+
 		ApplyEffects: core.ApplyEffectFuncDamageMultiple(effects),
 	})
 }
@@ -127,9 +132,9 @@ func (wp *WarlockPet) newCleave() *core.Spell {
 func (wp *WarlockPet) newLashOfPain() *core.Spell {
 	baseCost := 250.0
 	return wp.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 47992},
-		SpellSchool: core.SpellSchoolShadow,
-
+		ActionID:     core.ActionID{SpellID: 47992},
+		SpellSchool:  core.SpellSchoolShadow,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -144,14 +149,17 @@ func (wp *WarlockPet) newLashOfPain() *core.Spell {
 				Duration: time.Second * (12 - time.Duration(3*wp.owner.Talents.DemonicPower)),
 			},
 		},
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskSpellDamage,
-			DamageMultiplier: 1.0,
-			ThreatMultiplier: 1,
+
+		BonusCritRating:  wp.owner.masterDemonologistShadowCrit(),
+		DamageMultiplier: 1,
+		CritMultiplier:   1.5,
+		ThreatMultiplier: 1,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
 			// TODO: the hidden 5% damage modifier succ currently gets also applies to this ...
-			BaseDamage:     core.BaseDamageConfigMagic(237, 237, 0.429),
-			OutcomeApplier: wp.OutcomeFuncMagicHitAndCrit(1.5),
-		}),
+			baseDamage := 237 + 0.429*spell.SpellPower()
+			spell.CalcAndDealDamageMagicHitAndCrit(sim, target, baseDamage)
+		},
 	})
 }
 
@@ -159,21 +167,17 @@ func (wp *WarlockPet) newShadowBite() *core.Spell {
 	actionID := core.ActionID{SpellID: 54053}
 	baseCost := 131.0 // TODO: should be 3% of BaseMana, but it's unclear what that actually refers to with pets
 
-	var onSpellHitDealt func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect)
-	if wp.owner.Talents.ImprovedFelhunter > 0 {
-		petManaMetrics := wp.NewManaMetrics(actionID)
-		maxManaMult := 0.04 * float64(wp.owner.Talents.ImprovedFelhunter)
-		onSpellHitDealt = func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spellEffect.Landed() {
-				wp.AddMana(sim, wp.MaxMana()*maxManaMult, petManaMetrics, true)
-			}
-		}
+	var petManaMetrics *core.ResourceMetrics
+	maxManaMult := 0.04 * float64(wp.owner.Talents.ImprovedFelhunter)
+	impFelhunter := wp.owner.Talents.ImprovedFelhunter > 0
+	if impFelhunter {
+		petManaMetrics = wp.NewManaMetrics(actionID)
 	}
 
 	return wp.RegisterSpell(core.SpellConfig{
-		ActionID:    actionID,
-		SpellSchool: core.SpellSchoolShadow,
-
+		ActionID:     actionID,
+		SpellSchool:  core.SpellSchoolShadow,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -188,32 +192,35 @@ func (wp *WarlockPet) newShadowBite() *core.Spell {
 				Duration: time.Second * (6 - time.Duration(2*wp.owner.Talents.ImprovedFelhunter)),
 			},
 		},
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskSpellDamage,
-			DamageMultiplier: 1.0 + 0.03*float64(wp.owner.Talents.ShadowMastery),
-			ThreatMultiplier: 1,
-			BaseDamage: core.WrapBaseDamageConfig(core.BaseDamageConfigMagic(97+1, 97+41, 0.429),
-				func(oldCalc core.BaseDamageCalculator) core.BaseDamageCalculator {
-					return func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-						w := wp.owner
-						dots := []*core.Dot{
-							w.UnstableAfflictionDot, w.ImmolateDot, w.CurseOfAgonyDot,
-							w.CurseOfDoomDot, w.CorruptionDot, w.ConflagrateDot,
-							w.SeedDots[hitEffect.Target.Index], w.DrainSoulDot,
-							// missing: drain life, shadowflame
-						}
-						counter := 0
-						for _, dot := range dots {
-							if dot.IsActive() {
-								counter++
-							}
-						}
 
-						return oldCalc(sim, hitEffect, spell) * (1.0 + 0.15*float64(counter))
-					}
-				}),
-			OutcomeApplier:  wp.OutcomeFuncMagicHitAndCritBinary(1.5 + 0.1*float64(wp.owner.Talents.Ruin)),
-			OnSpellHitDealt: onSpellHitDealt,
-		}),
+		DamageMultiplier: 1 + 0.03*float64(wp.owner.Talents.ShadowMastery),
+		CritMultiplier:   1.5 + 0.1*float64(wp.owner.Talents.Ruin),
+		ThreatMultiplier: 1,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := sim.Roll(97+1, 97+41) + 0.429*spell.SpellPower()
+
+			w := wp.owner
+			dots := []*core.Dot{
+				w.UnstableAfflictionDot, w.ImmolateDot, w.CurseOfAgonyDot,
+				w.CurseOfDoomDot, w.CorruptionDot, w.ConflagrateDot,
+				w.SeedDots[target.Index], w.DrainSoulDot,
+				// missing: drain life, shadowflame
+			}
+			counter := 0
+			for _, dot := range dots {
+				if dot.IsActive() {
+					counter++
+				}
+			}
+
+			baseDamage *= 1 + 0.15*float64(counter)
+
+			result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCritBinary)
+			if impFelhunter && result.Landed() {
+				wp.AddMana(sim, wp.MaxMana()*maxManaMult, petManaMetrics, true)
+			}
+			spell.DealDamage(sim, &result)
+		},
 	})
 }

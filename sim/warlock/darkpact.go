@@ -13,32 +13,33 @@ func (warlock *Warlock) registerDarkPactSpell() {
 	baseRestore := 1200.0
 	manaMetrics := warlock.NewManaMetrics(actionID)
 	petManaMetrics := warlock.Pet.NewManaMetrics(actionID)
+	hasGlyph := warlock.HasMajorGlyph(proto.WarlockMajorGlyph_GlyphOfLifeTap)
 
 	warlock.DarkPact = warlock.RegisterSpell(core.SpellConfig{
 		ActionID:    actionID,
 		SpellSchool: core.SpellSchoolShadow,
+		ProcMask:    core.ProcMaskEmpty,
+
 		Cast: core.CastConfig{
 			DefaultCast: core.Cast{
 				GCD: core.GCDDefault,
 			},
 		},
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskEmpty,
-			ThreatMultiplier: 1 - 0.1*float64(warlock.Talents.ImprovedDrainSoul),
-			FlatThreatBonus:  80,
-			OutcomeApplier:   warlock.OutcomeFuncAlwaysHit(),
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				// Glyph activates and applies SP before coef calculations are done
-				if warlock.HasMajorGlyph(proto.WarlockMajorGlyph_GlyphOfLifeTap) {
-					warlock.GlyphOfLifeTapAura.Activate(sim)
-				}
 
-				maxDrain := baseRestore + (warlock.GetStat(stats.SpellPower)+warlock.GetStat(stats.ShadowSpellPower))*0.96
-				actualDrain := math.Min(maxDrain, warlock.Pet.CurrentMana())
+		ThreatMultiplier: 1 - 0.1*float64(warlock.Talents.ImprovedDrainSoul),
+		FlatThreatBonus:  80,
 
-				warlock.Pet.SpendMana(sim, actualDrain, petManaMetrics)
-				warlock.AddMana(sim, actualDrain, manaMetrics, true)
-			},
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			// Glyph activates and applies SP before coeff calculations are done.
+			if hasGlyph {
+				warlock.GlyphOfLifeTapAura.Activate(sim)
+			}
+
+			maxDrain := baseRestore + 0.96*warlock.GetStat(stats.SpellPower)
+			actualDrain := math.Min(maxDrain, warlock.Pet.CurrentMana())
+
+			warlock.Pet.SpendMana(sim, actualDrain, petManaMetrics)
+			warlock.AddMana(sim, actualDrain, manaMetrics, true)
+		},
 	})
 }

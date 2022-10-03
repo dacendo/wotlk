@@ -9,7 +9,11 @@ import (
 	"github.com/wowsims/wotlk/sim/core/proto"
 )
 
-// newLightningBoltSpell returns a precomputed instance of lightning bolt to use for casting.
+func (shaman *Shaman) registerLightningBoltSpell() {
+	shaman.LightningBolt = shaman.newLightningBoltSpell(false)
+	shaman.LightningBoltLO = shaman.newLightningBoltSpell(true)
+}
+
 func (shaman *Shaman) newLightningBoltSpell(isLightningOverload bool) *core.Spell {
 	baseCost := baseMana * 0.1
 	cost := baseCost
@@ -38,25 +42,27 @@ func (shaman *Shaman) newLightningBoltSpell(isLightningOverload bool) *core.Spel
 		}
 	}
 
-	effect := shaman.newElectricSpellEffect(719, 819, 0.7143, isLightningOverload)
 	if shaman.HasMajorGlyph(proto.ShamanMajorGlyph_GlyphOfLightningBolt) {
-		effect.DamageMultiplier *= 1.04
+		spellConfig.DamageMultiplier *= 1.04
 	}
 
 	if shaman.HasSetBonus(ItemSetSkyshatterRegalia, 4) {
-		effect.DamageMultiplier *= 1.05
+		spellConfig.DamageMultiplier *= 1.05
 	}
 
-	has4pT8 := shaman.HasSetBonus(ItemSetWorldbreakerGarb, 4)
-	var lbdot *core.Dot
-	var applyDot func(sim *core.Simulation, dmg float64)
-	if has4pT8 && !isLightningOverload {
-		lbdotDmg := 0.0 // dynamically changing dmg
+	applyDot := !isLightningOverload && shaman.HasSetBonus(ItemSetWorldbreakerGarb, 4)
+	var lbDot *core.Dot
+	lbdotDmg := 0.0 // dynamically changing dmg
+	if applyDot {
 		spell := shaman.RegisterSpell(core.SpellConfig{
 			ActionID: core.ActionID{SpellID: 64930},
-			Flags:    core.SpellFlagIgnoreModifiers,
+			// TODO: Spell school?
+			ProcMask:         core.ProcMaskEmpty,
+			Flags:            core.SpellFlagIgnoreModifiers,
+			DamageMultiplier: 1,
+			ThreatMultiplier: 1,
 		})
-		lbdot = core.NewDot(core.Dot{
+		lbDot = core.NewDot(core.Dot{
 			Spell: spell,
 			Aura: shaman.CurrentTarget.RegisterAura(core.Aura{
 				Label:    "Electrified-" + strconv.Itoa(int(shaman.Index)),
@@ -65,46 +71,39 @@ func (shaman *Shaman) newLightningBoltSpell(isLightningOverload bool) *core.Spel
 			TickLength:    time.Second * 2,
 			NumberOfTicks: 2,
 			TickEffects: core.TickFuncSnapshot(shaman.CurrentTarget, core.SpellEffect{
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
 				BaseDamage: core.BaseDamageConfig{
 					Calculator: func(_ *core.Simulation, _ *core.SpellEffect, _ *core.Spell) float64 {
 						return lbdotDmg / 2 //spread dot over 2 ticks
 					},
 				},
 				IsPeriodic:     true,
-				ProcMask:       core.ProcMaskEmpty,
 				OutcomeApplier: shaman.OutcomeFuncTick(),
 			}),
 		})
-		applyDot = func(sim *core.Simulation, dmg float64) {
-			lbdotDmg = dmg * 0.08 // TODO: does this pool with a currently ticking dot?
-			lbdot.Apply(sim)      // will resnapshot
-		}
-		effect.OnSpellHitDealt = func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.DidCrit() {
-				return
-			}
-			applyDot(sim, spellEffect.Damage)
-		}
 	}
 
-	if !isLightningOverload && shaman.Talents.LightningOverload > 0 {
-		lightningOverloadChance := float64(shaman.Talents.LightningOverload) * 0.11
-		effect.OnSpellHitDealt = func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.Landed() {
-				return
+	dmgBonus := shaman.electricSpellBonusDamage(0.7143)
+	spellCoeff := 0.7143 + 0.04*float64(shaman.Talents.Shamanism)
+
+	canLO := !isLightningOverload && shaman.Talents.LightningOverload > 0
+	lightningOverloadChance := float64(shaman.Talents.LightningOverload) * 0.11
+
+	spellConfig.ApplyEffects = func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+		baseDamage := dmgBonus + sim.Roll(719, 819) + spellCoeff*spell.SpellPower()
+		result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCrit)
+
+		if result.Landed() {
+			if applyDot && result.DidCrit() { // need to merge in the 4pt8 effect
+				lbdotDmg = result.Damage * 0.08 // TODO: does this pool with a currently ticking dot?
+				lbDot.Apply(sim)                // will resnapshot
 			}
-			if has4pT8 && spellEffect.DidCrit() { // need to merge in the 4pt8 effect
-				applyDot(sim, spellEffect.Damage)
+			if canLO && sim.RandomFloat("LB Lightning Overload") <= lightningOverloadChance {
+				shaman.LightningBoltLO.Cast(sim, target)
 			}
-			if sim.RandomFloat("LB Lightning Overload") > lightningOverloadChance {
-				return
-			}
-			shaman.LightningBoltLO.Cast(sim, spellEffect.Target)
 		}
+
+		spell.DealDamage(sim, &result)
 	}
 
-	spellConfig.ApplyEffects = core.ApplyEffectFuncDirectDamage(effect)
 	return shaman.RegisterSpell(spellConfig)
 }

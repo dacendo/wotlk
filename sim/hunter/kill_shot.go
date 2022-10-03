@@ -12,10 +12,10 @@ func (hunter *Hunter) registerKillShotSpell() {
 	baseCost := 0.07 * hunter.BaseMana
 
 	hunter.KillShot = hunter.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 61006},
-		SpellSchool: core.SpellSchoolPhysical,
-		Flags:       core.SpellFlagMeleeMetrics,
-
+		ActionID:     core.ActionID{SpellID: 61006},
+		SpellSchool:  core.SpellSchoolPhysical,
+		ProcMask:     core.ProcMaskRangedSpecial,
+		Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -31,25 +31,22 @@ func (hunter *Hunter) registerKillShotSpell() {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:        core.ProcMaskRangedSpecial,
-			BonusCritRating: 5 * core.CritRatingPerCritChance * float64(hunter.Talents.SniperTraining),
-			DamageMultiplier: 1 *
-				hunter.markedForDeathMultiplier(),
-			ThreatMultiplier: 1,
+		BonusCritRating: 0 +
+			5*core.CritRatingPerCritChance*float64(hunter.Talents.SniperTraining),
+		DamageMultiplier: 1 *
+			hunter.markedForDeathMultiplier(),
+		CritMultiplier:   hunter.critMultiplier(true, true, hunter.CurrentTarget),
+		ThreatMultiplier: 1,
 
-			BaseDamage: core.BaseDamageConfig{
-				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					rap := hitEffect.RangedAttackPower(spell.Unit) + hitEffect.RangedAttackPowerOnTarget()
-					return 2 * (rap*0.4 + // 0.2 rap from normalized weapon (2.8/14) and 0.2 from bonus ratio
-						hunter.AutoAttacks.Ranged.BaseDamage(sim) +
-						hunter.AmmoDamageBonus +
-						hitEffect.BonusWeaponDamage(spell.Unit) +
-						325)
-				},
-				TargetSpellCoefficient: 1,
-			},
-			OutcomeApplier: hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(true, true, hunter.CurrentTarget)),
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			// 0.2 rap from normalized weapon (2.8/14) and 0.2 from bonus ratio
+			baseDamage := 0.4*spell.RangedAttackPower(target) +
+				hunter.AutoAttacks.Ranged.BaseDamage(sim) +
+				hunter.AmmoDamageBonus +
+				spell.BonusWeaponDamage() +
+				325
+			baseDamage *= 2
+			spell.CalcAndDealDamageRangedHitAndCrit(sim, target, baseDamage)
+		},
 	})
 }

@@ -17,39 +17,38 @@ func (mage *Mage) registerLivingBombSpell() {
 	baseCost := .22 * mage.BaseMana
 	bonusCrit := float64(mage.Talents.WorldInFlames+mage.Talents.CriticalMass) * 2 * core.CritRatingPerCritChance
 
-	livingBombExplosionEffect := core.SpellEffect{
-		ProcMask:             core.ProcMaskSpellDamage,
-		BonusSpellCritRating: bonusCrit,
+	livingBombExplosionSpell := mage.RegisterSpell(core.SpellConfig{
+		ActionID:    actionID,
+		SpellSchool: core.SpellSchoolFire,
+		ProcMask:    core.ProcMaskSpellDamage,
+		Flags:       SpellFlagMage | HotStreakSpells,
 
+		BonusCritRating:  bonusCrit,
 		DamageMultiplier: mage.spellDamageMultiplier,
+		CritMultiplier:   mage.SpellCritMultiplier(1, mage.bonusCritDamage),
 		ThreatMultiplier: 1 - 0.1*float64(mage.Talents.BurningSoul),
 
-		BaseDamage: core.BaseDamageConfigMagicNoRoll(690, 1.5/3.5),
-
-		OutcomeApplier: mage.fireSpellOutcomeApplier(mage.bonusCritDamage),
-	}
-
-	livingBombExplosionSpell := mage.RegisterSpell(core.SpellConfig{
-		Flags:        SpellFlagMage | HotStreakSpells,
-		ActionID:     actionID,
-		SpellSchool:  core.SpellSchoolFire,
-		Cast:         core.CastConfig{},
-		ApplyEffects: core.ApplyEffectFuncAOEDamageCapped(mage.Env, livingBombExplosionEffect),
-		// ApplyEffects: core.ApplyEffectFuncDirectDamage(livingBombExplosionEffect),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := 690 + (1.5/3.5)*spell.SpellPower()
+			baseDamage *= sim.Encounter.AOECapMultiplier()
+			for _, aoeTarget := range sim.Encounter.Targets {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, &aoeTarget.Unit, baseDamage)
+			}
+		},
 	})
 
 	target := mage.CurrentTarget
 
 	lbOutcomeApplier := mage.OutcomeFuncTick()
 	if mage.HasMajorGlyph(proto.MageMajorGlyph_GlyphOfLivingBomb) {
-		lbOutcomeApplier = mage.fireSpellOutcomeApplier(mage.bonusCritDamage)
+		lbOutcomeApplier = mage.OutcomeFuncMagicHitAndCrit()
 	}
 
 	mage.LivingBomb = mage.RegisterSpell(core.SpellConfig{
-		ActionID:    actionIDSpell,
-		SpellSchool: core.SpellSchoolFire,
-		Flags:       SpellFlagMage,
-
+		ActionID:     actionIDSpell,
+		SpellSchool:  core.SpellSchoolFire,
+		ProcMask:     core.ProcMaskEmpty,
+		Flags:        SpellFlagMage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -62,7 +61,6 @@ func (mage *Mage) registerLivingBombSpell() {
 		},
 
 		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:       core.ProcMaskEmpty,
 			OutcomeApplier: mage.OutcomeFuncMagicHit(),
 			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				mage.LivingBombDots[mage.CurrentTarget.Index].Apply(sim)
@@ -71,10 +69,15 @@ func (mage *Mage) registerLivingBombSpell() {
 	})
 
 	livingBombDotSpell := mage.RegisterSpell(core.SpellConfig{
-		ActionID:    actionIDDot,
-		SpellSchool: core.SpellSchoolFire,
-		Flags:       SpellFlagMage,
-		Cast:        core.CastConfig{},
+		ActionID:         actionIDDot,
+		SpellSchool:      core.SpellSchoolFire,
+		ProcMask:         core.ProcMaskEmpty,
+		Flags:            SpellFlagMage,
+		Cast:             core.CastConfig{},
+		BonusCritRating:  bonusCrit,
+		DamageMultiplier: mage.spellDamageMultiplier,
+		CritMultiplier:   mage.SpellCritMultiplier(1, mage.bonusCritDamage),
+		ThreatMultiplier: 1 - 0.1*float64(mage.Talents.BurningSoul),
 	})
 
 	mage.LivingBombDots[target.Index] = core.NewDot(core.Dot{
@@ -97,13 +100,6 @@ func (mage *Mage) registerLivingBombSpell() {
 		AffectedByCastSpeed: false,
 
 		TickEffects: core.TickFuncSnapshot(target, core.SpellEffect{
-			ProcMask: core.ProcMaskPeriodicDamage,
-
-			BonusSpellCritRating: bonusCrit,
-
-			DamageMultiplier: mage.spellDamageMultiplier,
-			ThreatMultiplier: 1 - 0.1*float64(mage.Talents.BurningSoul),
-
 			BaseDamage:     core.BaseDamageConfigMagicNoRoll(345, .2),
 			OutcomeApplier: lbOutcomeApplier,
 			IsPeriodic:     true,

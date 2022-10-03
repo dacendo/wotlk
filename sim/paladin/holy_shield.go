@@ -10,35 +10,28 @@ import (
 
 func (paladin *Paladin) registerHolyShieldSpell() {
 	actionID := core.ActionID{SpellID: 48952}
-
 	numCharges := int32(8)
 
+	// Holy Shield can be both fully and partially resisted in WotLK, so it doesn't use SpellFlagBinary here,
+	//	but does use CalcAndDealDamageMagicHitBinary() below.
+	// TODO needs research ;)
 	procSpell := paladin.RegisterSpell(core.SpellConfig{
 		ActionID:    actionID.WithTag(1),
 		SpellSchool: core.SpellSchoolHoly,
-		Flags:       core.SpellFlagBinary,
+		ProcMask:    core.ProcMaskEmpty,
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask: core.ProcMaskEmpty,
-			// DamageMultiplier: 1 + 0.1*float64(paladin.Talents.ImprovedHolyShield),
-			DamageMultiplier: 1,
-			ThreatMultiplier: 1.35,
+		// DamageMultiplier: 1 + 0.1*float64(paladin.Talents.ImprovedHolyShield),
+		DamageMultiplier: 1,
+		ThreatMultiplier: 1,
 
-			BaseDamage: core.BaseDamageConfig{
-				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					// TODO: examine this
-					scaling := hybridScaling{
-						AP: 0.07,
-						SP: 0.11,
-					}
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			// Beta testing shows wowhead coeffs are probably correct
+			baseDamage := 274 +
+				0.0732*spell.MeleeAttackPower() +
+				0.117*spell.SpellPower()
 
-					damage := 274 + (scaling.AP * hitEffect.MeleeAttackPower(spell.Unit)) + (scaling.SP * hitEffect.SpellPower(spell.Unit, spell))
-
-					return damage
-				},
-			},
-			OutcomeApplier: paladin.OutcomeFuncMagicHitBinary(),
-		}),
+			spell.CalcAndDealDamageMagicHitBinary(sim, target, baseDamage)
+		},
 	})
 
 	blockBonus := 30*core.BlockRatingPerBlockChance + core.TernaryFloat64(paladin.Equip[proto.ItemSlot_ItemSlotRanged].ID == 29388, 42, 0)
@@ -57,6 +50,7 @@ func (paladin *Paladin) registerHolyShieldSpell() {
 		},
 		OnSpellHitTaken: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 			if spellEffect.Outcome.Matches(core.OutcomeBlock) {
+				// TODO: Shouldn't this be spellEffect.Target instead of spell.Unit?
 				procSpell.Cast(sim, spell.Unit)
 				aura.RemoveStack(sim)
 			}

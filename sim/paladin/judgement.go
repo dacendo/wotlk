@@ -20,10 +20,10 @@ func (paladin *Paladin) registerJudgementOfWisdomSpell(cdTimer *core.Timer) {
 	baseCost := paladin.BaseMana * 0.05
 
 	paladin.JudgementOfWisdom = paladin.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 53408},
-		SpellSchool: core.SpellSchoolHoly,
-		Flags:       SpellFlagPrimaryJudgement,
-
+		ActionID:     core.ActionID{SpellID: 53408},
+		SpellSchool:  core.SpellSchoolHoly,
+		ProcMask:     core.ProcMaskEmpty,
+		Flags:        SpellFlagPrimaryJudgement,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -42,10 +42,11 @@ func (paladin *Paladin) registerJudgementOfWisdomSpell(cdTimer *core.Timer) {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:       core.ProcMaskEmpty,
-			OutcomeApplier: paladin.OutcomeFuncRangedHit(), // Primary Judgements cannot crit or be dodged, parried, or blocked-- only miss. (Unless target is a hunter.)
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			// Primary Judgements cannot crit or be dodged, parried, or blocked-- only miss. (Unless target is a hunter.)
+			result := spell.CalcOutcome(sim, target, spell.OutcomeRangedHit)
+			spell.DealOutcome(sim, &result)
+		},
 	})
 }
 
@@ -55,10 +56,10 @@ func (paladin *Paladin) registerJudgementOfLightSpell(cdTimer *core.Timer) {
 	baseCost := paladin.BaseMana * 0.05
 
 	paladin.JudgementOfLight = paladin.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 20271},
-		SpellSchool: core.SpellSchoolHoly,
-		Flags:       SpellFlagPrimaryJudgement,
-
+		ActionID:     core.ActionID{SpellID: 20271},
+		SpellSchool:  core.SpellSchoolHoly,
+		ProcMask:     core.ProcMaskEmpty,
+		Flags:        SpellFlagPrimaryJudgement,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -77,10 +78,11 @@ func (paladin *Paladin) registerJudgementOfLightSpell(cdTimer *core.Timer) {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:       core.ProcMaskEmpty,
-			OutcomeApplier: paladin.OutcomeFuncRangedHit(), // Primary Judgements cannot crit or be dodged, parried, or blocked-- only miss. (Unless target is a hunter.)
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			// Primary Judgements cannot crit or be dodged, parried, or blocked-- only miss. (Unless target is a hunter.)
+			result := spell.CalcOutcome(sim, target, spell.OutcomeRangedHit)
+			spell.DealOutcome(sim, &result)
+		},
 	})
 }
 
@@ -95,7 +97,7 @@ func (paladin *Paladin) registerJudgementOfLightSpell(cdTimer *core.Timer) {
 // 			aura.Activate(sim)
 // 		},
 // 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-// 			if spellEffect.Landed() && spellEffect.ProcMask.Matches(core.ProcMaskMeleeWhiteHit) {
+// 			if spellEffect.Landed() && spell.ProcMask.Matches(core.ProcMaskMeleeWhiteHit) {
 // 				if paladin.CurrentJudgement != nil && paladin.CurrentJudgement.IsActive() {
 // 					// Refresh the judgement
 // 					paladin.CurrentJudgement.Refresh(sim)

@@ -78,8 +78,13 @@ func init() {
 				handOfJusticeSpell = character.GetOrRegisterSpell(core.SpellConfig{
 					ActionID:     core.ActionID{ItemID: 11815},
 					SpellSchool:  core.SpellSchoolPhysical,
-					Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagNoOnCastComplete,
-					ApplyEffects: core.ApplyEffectFuncDirectDamage(character.AutoAttacks.MHEffect),
+					ProcMask:     core.ProcMaskMeleeMHAuto,
+					Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage | core.SpellFlagNoOnCastComplete,
+					ApplyEffects: character.AutoAttacks.MHConfig.ApplyEffects,
+
+					DamageMultiplier: 1,
+					CritMultiplier:   character.DefaultMeleeCritMultiplier(),
+					ThreatMultiplier: 1,
 				})
 			},
 			OnReset: func(aura *core.Aura, sim *core.Simulation) {
@@ -87,7 +92,7 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// https://wotlk.wowhead.com/spell=15600/hand-of-justice, proc mask = 20.
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMelee) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMelee) {
 					return
 				}
 
@@ -155,11 +160,11 @@ func init() {
 				if !spellEffect.Landed() {
 					return
 				}
-				if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 
-				if !ppmm.Proc(sim, spellEffect.ProcMask, "Badge of the Swarmguard") {
+				if !ppmm.Proc(sim, spell.ProcMask, "Badge of the Swarmguard") {
 					return
 				}
 
@@ -186,7 +191,7 @@ func init() {
 
 		character.AddMajorCooldown(core.MajorCooldown{
 			Spell: spell,
-			Type:  core.CooldownTypeDPS | core.CooldownTypeUsableShapeShifted,
+			Type:  core.CooldownTypeDPS,
 		})
 	})
 
@@ -217,7 +222,7 @@ func init() {
 				if !spellEffect.Outcome.Matches(core.OutcomeCrit) {
 					return
 				}
-				if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 				if !icd.IsReady(sim) {
@@ -239,14 +244,15 @@ func init() {
 		procSpell := character.RegisterSpell(core.SpellConfig{
 			ActionID:    core.ActionID{ItemID: 28579},
 			SpellSchool: core.SpellSchoolNature,
-			ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-				ProcMask:         core.ProcMaskEmpty,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
+			ProcMask:    core.ProcMaskEmpty,
 
-				BaseDamage:     core.BaseDamageConfigRoll(222, 332),
-				OutcomeApplier: character.OutcomeFuncMagicHitAndCrit(character.DefaultSpellCritMultiplier()),
-			}),
+			DamageMultiplier: 1,
+			CritMultiplier:   character.DefaultSpellCritMultiplier(),
+			ThreatMultiplier: 1,
+
+			ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, target, sim.Roll(222, 332))
+			},
 		})
 
 		ppmm := character.AutoAttacks.NewPPMManager(1.0, core.ProcMaskMeleeOrRanged)
@@ -259,10 +265,10 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// mask 340
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
-				if !ppmm.Proc(sim, spellEffect.ProcMask, "RomulosPoisonVial") {
+				if !ppmm.Proc(sim, spell.ProcMask, "RomulosPoisonVial") {
 					return
 				}
 
@@ -289,13 +295,13 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// mask: 340
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 				if !icd.IsReady(sim) {
 					return
 				}
-				if !ppmm.Proc(sim, spellEffect.ProcMask, "dragonspine") {
+				if !ppmm.Proc(sim, spell.ProcMask, "dragonspine") {
 					return
 				}
 				icd.Use(sim)
@@ -325,7 +331,7 @@ func init() {
 				if !spellEffect.Outcome.Matches(core.OutcomeCrit) {
 					return
 				}
-				if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 				if !icd.IsReady(sim) {
@@ -363,7 +369,7 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// mask 340
-				if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 
@@ -380,19 +386,24 @@ func init() {
 	core.NewItemEffect(31858, func(agent core.Agent) {
 		character := agent.GetCharacter()
 		actionID := core.ActionID{ItemID: 31858}
+		var outcomeApplier core.NewOutcomeApplier
 
 		procSpell := character.RegisterSpell(core.SpellConfig{
 			ActionID:    actionID,
 			SpellSchool: core.SpellSchoolHoly,
-			ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-				ProcMask:         core.ProcMaskEmpty,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
+			ProcMask:    core.ProcMaskEmpty,
 
-				BaseDamage:     core.BaseDamageConfigRoll(95, 115),
-				OutcomeApplier: character.OutcomeFuncCritFixedChance(0.03, character.DefaultMeleeCritMultiplier()),
-			}),
+			DamageMultiplier: 1,
+			CritMultiplier:   character.DefaultMeleeCritMultiplier(),
+			ThreatMultiplier: 1,
+
+			ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+				baseDamage := sim.Roll(95, 115)
+				result := spell.CalcDamage(sim, target, baseDamage, outcomeApplier)
+				spell.DealDamage(sim, &result)
+			},
 		})
+		outcomeApplier = procSpell.OutcomeCritFixedChance(0.03)
 
 		// Normal proc chance.
 		procChance := 0.1
@@ -411,7 +422,7 @@ func init() {
 		var onSpellHitDealt core.OnSpellHit
 		if procChanceOnHitDealt > 0 {
 			onSpellHitDealt = func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() && spellEffect.ProcMask.Matches(core.ProcMaskMelee) && sim.RandomFloat("DMC Vengeance") < procChanceOnHitDealt {
+				if spellEffect.Landed() && spell.ProcMask.Matches(core.ProcMaskMelee) && sim.RandomFloat("DMC Vengeance") < procChanceOnHitDealt {
 					procSpell.Cast(sim, spellEffect.Target)
 				}
 			}
@@ -446,10 +457,10 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// mask 340
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
-				if !ppmm.Proc(sim, spellEffect.ProcMask, "Madness of the Betrayer") {
+				if !ppmm.Proc(sim, spell.ProcMask, "Madness of the Betrayer") {
 					return
 				}
 
@@ -474,7 +485,7 @@ func init() {
 				character.AddStatsDynamic(sim, bonusPerStack.Multiply(float64(newStacks-oldStacks)))
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() && spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if spellEffect.Landed() && spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					aura.AddStack(sim)
 				}
 			},
@@ -495,7 +506,7 @@ func init() {
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				// mask 340
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 				if !icd.IsReady(sim) {
@@ -528,7 +539,7 @@ func init() {
 				aura.Activate(sim)
 			},
 			OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
+				if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskMeleeOrRanged) {
 					return
 				}
 				if !icd.IsReady(sim) {

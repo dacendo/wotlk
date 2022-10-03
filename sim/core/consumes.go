@@ -16,13 +16,11 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 		switch consumes.Flask {
 		case proto.Flask_FlaskOfTheFrostWyrm:
 			character.AddStats(stats.Stats{
-				stats.SpellPower:   125,
-				stats.HealingPower: 125,
+				stats.SpellPower: 125,
 			})
 			if character.HasProfession(proto.Profession_Alchemy) {
 				character.AddStats(stats.Stats{
-					stats.SpellPower:   47,
-					stats.HealingPower: 47,
+					stats.SpellPower: 47,
 				})
 			}
 		case proto.Flask_FlaskOfEndlessRage:
@@ -81,20 +79,20 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 				})
 			}
 		case proto.Flask_FlaskOfBlindingLight:
-			character.AddStats(stats.Stats{
-				stats.NatureSpellPower: 80,
-				stats.ArcaneSpellPower: 80,
-				stats.HolySpellPower:   80,
+			character.OnSpellRegistered(func(spell *Spell) {
+				if spell.SpellSchool.Matches(SpellSchoolArcane | SpellSchoolHoly | SpellSchoolNature) {
+					spell.BonusSpellPower += 80
+				}
 			})
 		case proto.Flask_FlaskOfMightyRestoration:
 			character.AddStats(stats.Stats{
 				stats.MP5: 25,
 			})
 		case proto.Flask_FlaskOfPureDeath:
-			character.AddStats(stats.Stats{
-				stats.FireSpellPower:   80,
-				stats.FrostSpellPower:  80,
-				stats.ShadowSpellPower: 80,
+			character.OnSpellRegistered(func(spell *Spell) {
+				if spell.SpellSchool.Matches(SpellSchoolFire | SpellSchoolFrost | SpellSchoolShadow) {
+					spell.BonusSpellPower += 80
+				}
 			})
 		case proto.Flask_FlaskOfRelentlessAssault:
 			character.AddStats(stats.Stats{
@@ -167,8 +165,7 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			})
 		case proto.BattleElixir_SpellpowerElixir:
 			character.AddStats(stats.Stats{
-				stats.SpellPower:   58,
-				stats.HealingPower: 58,
+				stats.SpellPower: 58,
 			})
 		case proto.BattleElixir_WrathElixir:
 			character.AddStats(stats.Stats{
@@ -177,9 +174,8 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			})
 		case proto.BattleElixir_AdeptsElixir:
 			character.AddStats(stats.Stats{
-				stats.SpellCrit:    24,
-				stats.SpellPower:   24,
-				stats.HealingPower: 24,
+				stats.SpellCrit:  24,
+				stats.SpellPower: 24,
 			})
 		case proto.BattleElixir_ElixirOfDemonslaying:
 			if character.CurrentTarget.MobType == proto.MobType_MobTypeDemon {
@@ -189,18 +185,6 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			character.AddStats(stats.Stats{
 				stats.Agility:   35,
 				stats.MeleeCrit: 20,
-			})
-		case proto.BattleElixir_ElixirOfMajorFirePower:
-			character.AddStats(stats.Stats{
-				stats.FireSpellPower: 55,
-			})
-		case proto.BattleElixir_ElixirOfMajorFrostPower:
-			character.AddStats(stats.Stats{
-				stats.FrostSpellPower: 55,
-			})
-		case proto.BattleElixir_ElixirOfMajorShadowPower:
-			character.AddStats(stats.Stats{
-				stats.ShadowSpellPower: 55,
 			})
 		case proto.BattleElixir_ElixirOfMajorStrength:
 			character.AddStats(stats.Stats{
@@ -290,16 +274,16 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			actionID := ActionID{SpellID: 11374}
 			goaProc := character.RegisterSpell(SpellConfig{
 				ActionID: actionID,
-				ApplyEffects: ApplyEffectFuncDirectDamage(SpellEffect{
-					ProcMask:         ProcMaskEmpty,
-					ThreatMultiplier: 1,
-					FlatThreatBonus:  90,
+				ProcMask: ProcMaskEmpty,
 
-					OutcomeApplier: character.OutcomeFuncAlwaysHit(),
-					OnSpellHitDealt: func(sim *Simulation, spell *Spell, spellEffect *SpellEffect) {
-						debuffAuras[spellEffect.Target.Index].Activate(sim)
-					},
-				}),
+				ThreatMultiplier: 1,
+				FlatThreatBonus:  90,
+
+				ApplyEffects: func(sim *Simulation, target *Unit, spell *Spell) {
+					debuffAuras[target.Index].Activate(sim)
+					// TODO: Make a function for "hit+threat" that doesn't do full damage calcs.
+					spell.CalcAndDealDamageAlwaysHit(sim, target, 0)
+				},
 			})
 
 			character.RegisterAura(Aura{
@@ -325,7 +309,6 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			stats.AttackPower:       80,
 			stats.RangedAttackPower: 80,
 			stats.SpellPower:        46,
-			stats.HealingPower:      46,
 			stats.Stamina:           40,
 		})
 	case proto.Food_FoodGreatFeast:
@@ -333,7 +316,6 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 			stats.AttackPower:       60,
 			stats.RangedAttackPower: 60,
 			stats.SpellPower:        35,
-			stats.HealingPower:      35,
 			stats.Stamina:           30,
 		})
 	case proto.Food_FoodBlackenedDragonfin:
@@ -382,9 +364,8 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 		})
 	case proto.Food_FoodFirecrackerSalmon:
 		character.AddStats(stats.Stats{
-			stats.SpellPower:   46,
-			stats.HealingPower: 46,
-			stats.Stamina:      40,
+			stats.SpellPower: 46,
+			stats.Stamina:    40,
 		})
 	case proto.Food_FoodCuttlesteak:
 		character.AddStats(stats.Stats{
@@ -398,9 +379,8 @@ func applyConsumeEffects(agent Agent, raidBuffs proto.RaidBuffs, partyBuffs prot
 		})
 	case proto.Food_FoodBlackenedBasilisk:
 		character.AddStats(stats.Stats{
-			stats.SpellPower:   23,
-			stats.HealingPower: 23,
-			stats.Spirit:       20,
+			stats.SpellPower: 23,
+			stats.Spirit:     20,
 		})
 	case proto.Food_FoodGrilledMudfish:
 		character.AddStats(stats.Stats{
@@ -445,12 +425,12 @@ func ApplyPetConsumeEffects(pet *Character, ownerConsumes proto.Consumes) {
 	case proto.PetFood_PetFoodSpicedMammothTreats:
 		pet.AddStats(stats.Stats{
 			stats.Strength: 30,
-			stats.Spirit:   30,
+			stats.Stamina:  30,
 		})
 	case proto.PetFood_PetFoodKiblersBits:
 		pet.AddStats(stats.Stats{
 			stats.Strength: 20,
-			stats.Spirit:   20,
+			stats.Stamina:  20,
 		})
 	}
 
@@ -658,7 +638,7 @@ func makePotionActivation(potionType proto.Potions, character *Character, potion
 		}
 	} else if potionType == proto.Potions_PotionOfWildMagic {
 		actionID := ActionID{ItemID: 40212}
-		aura := character.NewTemporaryStatsAura("Potion of Wild Magic", actionID, stats.Stats{stats.SpellPower: 200, stats.HealingPower: 200, stats.SpellCrit: 200, stats.MeleeCrit: 200}, time.Second*15-prepopTime)
+		aura := character.NewTemporaryStatsAura("Potion of Wild Magic", actionID, stats.Stats{stats.SpellPower: 200, stats.SpellCrit: 200, stats.MeleeCrit: 200}, time.Second*15-prepopTime)
 		return MajorCooldown{
 			Type: CooldownTypeDPS,
 			CanActivate: func(sim *Simulation, character *Character) bool {
@@ -1058,21 +1038,44 @@ func makeConjuredActivation(conjuredType proto.Conjured, character *Character) (
 
 		flameCapProc := character.RegisterSpell(SpellConfig{
 			ActionID:    actionID,
+			ProcMask:    ProcMaskEmpty,
 			SpellSchool: SpellSchoolFire,
-			ApplyEffects: ApplyEffectFuncDirectDamage(SpellEffect{
-				ProcMask:         ProcMaskEmpty,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
 
-				BaseDamage:     BaseDamageConfigFlat(40),
-				OutcomeApplier: character.OutcomeFuncMagicHitAndCrit(character.DefaultSpellCritMultiplier()),
-			}),
+			DamageMultiplier: 1,
+			CritMultiplier:   character.DefaultSpellCritMultiplier(),
+			ThreatMultiplier: 1,
+
+			ApplyEffects: func(sim *Simulation, target *Unit, spell *Spell) {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, target, 40)
+			},
 		})
 
 		const procChance = 0.185
-		flameCapAura := character.NewTemporaryStatsAura("Flame Cap", actionID, stats.Stats{stats.FireSpellPower: 80}, time.Minute)
+		//flameCapAura := character.NewTemporaryStatsAura("Flame Cap", actionID, stats.Stats{stats.FireSpellPower: 80}, time.Minute)
+		var fireSpells []*Spell
+		character.OnSpellRegistered(func(spell *Spell) {
+			if spell.SpellSchool.Matches(SpellSchoolFire) {
+				fireSpells = append(fireSpells, spell)
+			}
+		})
+
+		flameCapAura := character.RegisterAura(Aura{
+			Label:    "Flame Cap",
+			ActionID: actionID,
+			Duration: time.Minute,
+			OnGain: func(aura *Aura, sim *Simulation) {
+				for _, spell := range fireSpells {
+					spell.BonusSpellPower += 80
+				}
+			},
+			OnExpire: func(aura *Aura, sim *Simulation) {
+				for _, spell := range fireSpells {
+					spell.BonusSpellPower -= 80
+				}
+			},
+		})
 		flameCapAura.OnSpellHitDealt = func(aura *Aura, sim *Simulation, spell *Spell, spellEffect *SpellEffect) {
-			if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(ProcMaskMeleeOrRanged) {
+			if !spellEffect.Landed() || !spell.ProcMask.Matches(ProcMaskMeleeOrRanged) {
 				return
 			}
 			if sim.RandomFloat("Flame Cap Melee") > procChance {
@@ -1204,6 +1207,7 @@ func (character *Character) newBasicExplosiveSpellConfig(sharedTimer *Timer, act
 	return SpellConfig{
 		ActionID:    actionID,
 		SpellSchool: school,
+		ProcMask:    ProcMaskEmpty,
 
 		Cast: CastConfig{
 			CD: cooldown,
@@ -1213,20 +1217,19 @@ func (character *Character) newBasicExplosiveSpellConfig(sharedTimer *Timer, act
 			},
 		},
 
-		ApplyEffects: ApplyEffectFuncAOEDamage(character.Env, SpellEffect{
-			ProcMask: ProcMaskEmpty,
-			// Explosives always have 1% resist chance, so just give them hit cap.
-			BonusSpellHitRating: 100 * SpellHitRatingPerHitChance,
+		// Explosives always have 1% resist chance, so just give them hit cap.
+		BonusHitRating:   100 * SpellHitRatingPerHitChance,
+		DamageMultiplier: 1,
+		CritMultiplier:   2,
+		ThreatMultiplier: 1,
 
-			DamageMultiplier: 1,
-			ThreatMultiplier: 1,
-
-			BaseDamage:     BaseDamageConfigRoll(minDamage, maxDamage),
-			OutcomeApplier: character.OutcomeFuncMagicHitAndCrit(2),
+		ApplyEffects: func(sim *Simulation, target *Unit, spell *Spell) {
+			// TODO: AOE Cap
+			for _, aoeTarget := range sim.Encounter.Targets {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, &aoeTarget.Unit, sim.Roll(minDamage, maxDamage))
+			}
 			// TODO: Deal self-damage
-			//OnSpellHitDealt: func(sim *Simulation, spell *Spell, spellEffect *SpellEffect) {
-			//},
-		}),
+		},
 	}
 }
 func (character *Character) newThermalSapperSpell(sharedTimer *Timer) *Spell {

@@ -8,40 +8,18 @@ import (
 )
 
 func (warrior *Warrior) registerDemoralizingShoutSpell() {
-	cost := 10.0
-	cost -= float64(warrior.Talents.FocusedRage)
-	if warrior.HasSetBonus(ItemSetBoldArmor, 2) {
-		cost -= 2
+	cost := 10.0 - float64(warrior.Talents.FocusedRage)
+
+	dsAuras := make([]*core.Aura, warrior.Env.GetNumTargets())
+	for _, target := range warrior.Env.Encounter.Targets {
+		dsAuras[target.Index] = core.DemoralizingShoutAura(&target.Unit, warrior.Talents.BoomingVoice, warrior.Talents.ImprovedDemoralizingShout)
 	}
-
-	baseEffect := core.SpellEffect{
-		ProcMask:         core.ProcMaskEmpty,
-		ThreatMultiplier: 1,
-		FlatThreatBonus:  56,
-		OutcomeApplier:   warrior.OutcomeFuncMagicHit(),
-	}
-
-	numHits := warrior.Env.GetNumTargets()
-	effects := make([]core.SpellEffect, 0, numHits)
-	for i := int32(0); i < numHits; i++ {
-		effects = append(effects, baseEffect)
-		effects[i].Target = warrior.Env.GetTargetUnit(i)
-
-		demoShoutAura := core.DemoralizingShoutAura(effects[i].Target, warrior.Talents.BoomingVoice, warrior.Talents.ImprovedDemoralizingShout)
-		if i == 0 {
-			warrior.DemoralizingShoutAura = demoShoutAura
-		}
-
-		effects[i].OnSpellHitDealt = func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spellEffect.Landed() {
-				demoShoutAura.Activate(sim)
-			}
-		}
-	}
+	warrior.DemoralizingShoutAura = dsAuras[warrior.CurrentTarget.Index]
 
 	warrior.DemoralizingShout = warrior.RegisterSpell(core.SpellConfig{
 		ActionID:    core.ActionID{SpellID: 25203},
 		SpellSchool: core.SpellSchoolPhysical,
+		ProcMask:    core.ProcMaskEmpty,
 
 		ResourceType: stats.Rage,
 		BaseCost:     cost,
@@ -54,7 +32,18 @@ func (warrior *Warrior) registerDemoralizingShoutSpell() {
 			IgnoreHaste: true,
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDamageMultiple(effects),
+		ThreatMultiplier: 1,
+		FlatThreatBonus:  63.2,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			for _, aoeTarget := range sim.Encounter.Targets {
+				result := spell.CalcDamage(sim, &aoeTarget.Unit, 0, spell.OutcomeMagicHit)
+				spell.DealDamage(sim, &result)
+				if result.Landed() {
+					dsAuras[aoeTarget.Index].Activate(sim)
+				}
+			}
+		},
 	})
 }
 

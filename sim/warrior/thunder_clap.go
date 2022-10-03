@@ -1,6 +1,7 @@
 package warrior
 
 import (
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
@@ -8,44 +9,22 @@ import (
 )
 
 func (warrior *Warrior) registerThunderClapSpell() {
-	cost := 20.0 - float64(warrior.Talents.FocusedRage)
-	impTCDamageMult := 1.0
-	if warrior.Talents.ImprovedThunderClap == 1 {
-		cost -= 1
-		impTCDamageMult = 1.1
-	} else if warrior.Talents.ImprovedThunderClap == 2 {
-		cost -= 2
-		impTCDamageMult = 1.2
-	} else if warrior.Talents.ImprovedThunderClap == 3 {
-		cost -= 4
-		impTCDamageMult = 1.3
-	}
+	cost := 20.0 -
+		float64(warrior.Talents.FocusedRage) -
+		[]float64{0, 1, 2, 4}[warrior.Talents.ImprovedThunderClap] -
+		core.TernaryFloat64(warrior.HasMajorGlyph(proto.WarriorMajorGlyph_GlyphOfResonatingPower), 5, 0)
 
-	warrior.ThunderClapAura = core.ThunderClapAura(warrior.CurrentTarget, warrior.Talents.ImprovedThunderClap)
-
-	baseEffect := core.SpellEffect{
-		ProcMask:         core.ProcMaskSpellDamage,
-		DamageMultiplier: impTCDamageMult,
-		ThreatMultiplier: 1.75,
-		BonusCritRating:  float64(warrior.Talents.Incite) * 5 * core.CritRatingPerCritChance,
-		BaseDamage: core.BaseDamageConfig{
-			Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-				return hitEffect.MeleeAttackPower(spell.Unit)*0.12 + 300
-			},
-			TargetSpellCoefficient: 1,
-		},
-		OutcomeApplier: warrior.OutcomeFuncRangedHitAndCrit(warrior.critMultiplier(true)),
-		OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spellEffect.Landed() {
-				core.ThunderClapAura(spellEffect.Target, warrior.Talents.ImprovedThunderClap).Activate(sim)
-			}
-		},
+	tcAuras := make([]*core.Aura, warrior.Env.GetNumTargets())
+	for _, target := range warrior.Env.Encounter.Targets {
+		tcAuras[target.Index] = core.ThunderClapAura(&target.Unit, warrior.Talents.ImprovedThunderClap)
 	}
+	warrior.ThunderClapAura = tcAuras[warrior.CurrentTarget.Index]
 
 	warrior.ThunderClap = warrior.RegisterSpell(core.SpellConfig{
 		ActionID:    core.ActionID{SpellID: 47502},
 		SpellSchool: core.SpellSchoolPhysical,
-		Flags:       core.SpellFlagBinary,
+		ProcMask:    core.ProcMaskRangedSpecial,
+		Flags:       core.SpellFlagIncludeTargetBonusDamage,
 
 		ResourceType: stats.Rage,
 		BaseCost:     cost,
@@ -62,7 +41,23 @@ func (warrior *Warrior) registerThunderClapSpell() {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncAOEDamageCapped(warrior.Env, baseEffect),
+		BonusCritRating:  float64(warrior.Talents.Incite) * 5 * core.CritRatingPerCritChance,
+		DamageMultiplier: []float64{1.0, 1.1, 1.2, 1.3}[warrior.Talents.ImprovedThunderClap],
+		CritMultiplier:   warrior.critMultiplier(none),
+		ThreatMultiplier: 1.85,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := 300 + 0.12*spell.MeleeAttackPower()
+			baseDamage *= sim.Encounter.AOECapMultiplier()
+
+			for _, aoeTarget := range sim.Encounter.Targets {
+				result := spell.CalcDamage(sim, &aoeTarget.Unit, baseDamage, spell.OutcomeRangedHitAndCrit)
+				spell.DealDamage(sim, &result)
+				if result.Landed() {
+					tcAuras[aoeTarget.Index].Activate(sim)
+				}
+			}
+		},
 	})
 }
 

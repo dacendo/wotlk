@@ -2,6 +2,7 @@ import { MobType } from '../proto/common.js';
 import { SpellSchool } from '../proto/common.js';
 import { Stat } from '../proto/common.js';
 import { Encounter } from '../encounter.js';
+import { Raid } from '../raid.js';
 import { Target } from '../target.js';
 import { EventID, TypedEvent } from '../typed_event.js';
 import { BooleanPicker } from '../components/boolean_picker.js';
@@ -9,7 +10,7 @@ import { EnumPicker, EnumPickerConfig } from '../components/enum_picker.js';
 import { ListPicker, ListPickerConfig } from '../components/list_picker.js';
 import { NumberPicker } from '../components/number_picker.js';
 import { Stats } from '../proto_utils/stats.js';
-import { isTankSpec } from '../proto_utils/utils.js';
+import { isHealingSpec, isTankSpec } from '../proto_utils/utils.js';
 import { statNames } from '../proto_utils/names.js';
 import { getEnumValues } from '../utils.js';
 
@@ -34,7 +35,7 @@ export class EncounterPicker extends Component {
 		modEncounter.sim.waitForInit().then(() => {
 			const presetTargets = modEncounter.sim.getAllPresetTargets();
 			new EnumPicker<Encounter>(this.rootElem, modEncounter, {
-				extraCssClasses: ['npc-picker'],
+				extraCssClasses: ['damage-metrics', 'npc-picker'],
 				label: 'NPC',
 				labelTooltip: 'Selects a preset NPC configuration.',
 				values: [
@@ -94,6 +95,18 @@ export class EncounterPicker extends Component {
 			//	});
 			//}
 
+			if (simUI.isIndividualSim() && isHealingSpec((simUI as IndividualSimUI<any>).player.spec)) {
+				new NumberPicker(this.rootElem, simUI.sim.raid, {
+					label: 'Num Allies',
+					labelTooltip: 'Number of allied players in the raid.',
+					changedEvent: (raid: Raid) => raid.targetDummiesChangeEmitter,
+					getValue: (raid: Raid) => raid.getTargetDummies(),
+					setValue: (eventID: EventID, raid: Raid, newValue: number) => {
+						raid.setTargetDummies(eventID, newValue);
+					},
+				});
+			}
+
 			if (simUI.isIndividualSim() && isTankSpec((simUI as IndividualSimUI<any>).player.spec)) {
 				new NumberPicker(this.rootElem, modEncounter, {
 					label: 'Min Base Damage',
@@ -107,7 +120,7 @@ export class EncounterPicker extends Component {
 			}
 
 			const advancedButton = document.createElement('button');
-			advancedButton.classList.add('sim-button', 'advanced-button');
+			advancedButton.classList.add('sim-button', 'advanced-button', 'damage-metrics');
 			advancedButton.textContent = 'ADVANCED';
 			advancedButton.addEventListener('click', () => new AdvancedEncounterPicker(this.rootElem, modEncounter, simUI));
 			this.rootElem.appendChild(advancedButton);
@@ -303,6 +316,7 @@ class TargetPicker extends Component {
 		new NumberPicker(section3, modTarget, {
 			label: 'Swing Speed',
 			labelTooltip: 'Time in seconds between auto attacks. Set to 0 to disable auto attacks.',
+			float: true,
 			changedEvent: (target: Target) => target.propChangeEmitter,
 			getValue: (target: Target) => target.getSwingSpeed(),
 			setValue: (eventID: EventID, target: Target, newValue: number) => {
@@ -365,8 +379,8 @@ class TargetPicker extends Component {
 			},
 		});
 		new BooleanPicker(section3, modTarget, {
-			label: 'Sunwell Radiance',
-			labelTooltip: 'Reduces the chance for this enemy\'s attacks to be dodged by 20% and be missed by 5%. All Sunwell Plateau bosses have this.',
+			label: 'Chill of the Throne',
+			labelTooltip: 'Reduces the chance for this enemy\'s attacks to be dodged by 20%. Active in Icecrown Citadel.',
 			changedEvent: (target: Target) => target.changeEmitter,
 			getValue: (target: Target) => target.getSuppressDodge(),
 			setValue: (eventID: EventID, target: Target, newValue: boolean) => {

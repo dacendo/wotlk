@@ -3,6 +3,8 @@ package core
 import (
 	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
+	"math/bits"
+	"strconv"
 )
 
 type ProcMask uint32
@@ -52,7 +54,7 @@ const (
 	ProcMaskRangedAuto
 	ProcMaskRangedSpecial
 	ProcMaskSpellDamage
-	ProcMaskPeriodicDamage
+	ProcMaskSpellHealing
 )
 
 const (
@@ -114,14 +116,20 @@ const (
 	// These bits are set by the crit and damage rolls.
 	OutcomeCrit
 	OutcomeCrush
-	OutcomePartial1_4 // 1/4 of the spell was resisted.
-	OutcomePartial2_4 // 2/4 of the spell was resisted.
-	OutcomePartial3_4 // 3/4 of the spell was resisted.
+
+	OutcomePartial1
+	OutcomePartial2
+	OutcomePartial4
+	OutcomePartial8
 )
 
 const (
-	OutcomePartial = OutcomePartial1_4 | OutcomePartial2_4 | OutcomePartial3_4
+	OutcomePartial = OutcomePartial1 | OutcomePartial2 | OutcomePartial4 | OutcomePartial8
 	OutcomeLanded  = OutcomeHit | OutcomeCrit | OutcomeCrush | OutcomeGlance | OutcomeBlock
+)
+
+var (
+	OutcomePartialOffset = bits.TrailingZeros(uint(OutcomePartial1))
 )
 
 func (ho HitOutcome) String() string {
@@ -151,15 +159,10 @@ func (ho HitOutcome) String() string {
 }
 
 func (ho HitOutcome) PartialResistString() string {
-	if ho.Matches(OutcomePartial1_4) {
-		return " (25% Resist)"
-	} else if ho.Matches(OutcomePartial2_4) {
-		return " (50% Resist)"
-	} else if ho.Matches(OutcomePartial3_4) {
-		return " (75% Resist)"
-	} else {
-		return ""
+	if x := ho >> OutcomePartialOffset; x > 0 {
+		return " (" + strconv.Itoa(10*int(x)) + "% Resist)"
 	}
+	return ""
 }
 
 // Other flags
@@ -171,19 +174,20 @@ func (se SpellFlag) Matches(other SpellFlag) bool {
 }
 
 const (
-	SpellFlagNone                    SpellFlag = 0
-	SpellFlagIgnoreResists           SpellFlag = 1 << iota // skip spell resist/armor
-	SpellFlagIgnoreTargetModifiers                         // skip target damage modifiers
-	SpellFlagIgnoreAttackerModifiers                       // skip attacker damage modifiers
-	SpellFlagApplyArmorReduction                           // Forces damage reduction from armor to apply, even if it otherwise wouldn't.
-	SpellFlagCannotBeDodged                                // Ignores dodge in physical hit rolls
-	SpellFlagBinary                                        // Does not do partial resists and could need a different hit roll.
-	SpellFlagChanneled                                     // Spell is channeled
-	SpellFlagDisease                                       // Spell is categorized as disease
-	SpellFlagMeleeMetrics                                  // Marks a spell as a melee ability for metrics.
-	SpellFlagNoOnCastComplete                              // Disables OnCastComplete callbacks.
-	SpellFlagNoMetrics                                     // Disables metrics for a spell.
-	SpellFlagNoLogs                                        // Disables logs for a spell.
+	SpellFlagNone                     SpellFlag = 0
+	SpellFlagIgnoreResists            SpellFlag = 1 << iota // skip spell resist/armor
+	SpellFlagIgnoreTargetModifiers                          // skip target damage modifiers
+	SpellFlagIgnoreAttackerModifiers                        // skip attacker damage modifiers
+	SpellFlagApplyArmorReduction                            // Forces damage reduction from armor to apply, even if it otherwise wouldn't.
+	SpellFlagCannotBeDodged                                 // Ignores dodge in physical hit rolls
+	SpellFlagIncludeTargetBonusDamage                       // Spell benefits from Gift of Arthas and Hemorrhage.
+	SpellFlagBinary                                         // Does not do partial resists and could need a different hit roll.
+	SpellFlagChanneled                                      // Spell is channeled
+	SpellFlagDisease                                        // Spell is categorized as disease
+	SpellFlagMeleeMetrics                                   // Marks a spell as a melee ability for metrics.
+	SpellFlagNoOnCastComplete                               // Disables OnCastComplete callbacks.
+	SpellFlagNoMetrics                                      // Disables metrics for a spell.
+	SpellFlagNoLogs                                         // Disables logs for a spell.
 
 	// Used to let agents categorize their spells.
 	SpellFlagAgentReserved1
@@ -212,27 +216,6 @@ const (
 // Returns whether there is any overlap between the given masks.
 func (ss SpellSchool) Matches(other SpellSchool) bool {
 	return (ss & other) != 0
-}
-
-func (ss SpellSchool) Stat() stats.Stat {
-	switch ss {
-	case SpellSchoolArcane:
-		return stats.ArcaneSpellPower
-	case SpellSchoolFire:
-		return stats.FireSpellPower
-	case SpellSchoolFrost:
-		return stats.FrostSpellPower
-	case SpellSchoolHoly:
-		return stats.HolySpellPower
-	case SpellSchoolNature:
-		return stats.NatureSpellPower
-	case SpellSchoolShadow:
-		return stats.ShadowSpellPower
-	case SpellSchoolPhysical:
-		return 0 // should be weapon damage (mod_damage_done (physical))
-	}
-
-	return 0
 }
 
 func (ss SpellSchool) ResistanceStat() stats.Stat {

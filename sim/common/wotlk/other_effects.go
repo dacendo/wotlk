@@ -17,12 +17,12 @@ func init() {
 			Label:    "Essence of Gossamer",
 			ActionID: actionID,
 			Duration: time.Second * 10,
-			OnGain: func(aura *core.Aura, sim *core.Simulation) {
-				character.PseudoStats.BonusDamageTaken -= 140
-			},
-			OnExpire: func(aura *core.Aura, sim *core.Simulation) {
-				character.PseudoStats.BonusDamageTaken += 140
-			},
+		})
+
+		character.AddDynamicDamageTakenModifier(func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if procAura.IsActive() {
+				spellEffect.Damage = core.MaxFloat(0, spellEffect.Damage-140)
+			}
 		})
 
 		MakeProcTriggerAura(&character.Unit, ProcTrigger{
@@ -137,6 +137,7 @@ func init() {
 		spell := character.GetOrRegisterSpell(core.SpellConfig{
 			ActionID:    actionID,
 			SpellSchool: core.SpellSchoolNature,
+			ProcMask:    core.ProcMaskEmpty,
 			Flags:       core.SpellFlagNoOnCastComplete,
 
 			Cast: core.CastConfig{
@@ -150,14 +151,13 @@ func init() {
 				},
 			},
 
-			ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-				ProcMask:         core.ProcMaskEmpty,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
+			DamageMultiplier: 1,
+			CritMultiplier:   character.DefaultSpellCritMultiplier(),
+			ThreatMultiplier: 1,
 
-				BaseDamage:     core.BaseDamageConfigRoll(1530, 1870),
-				OutcomeApplier: character.OutcomeFuncMagicHitAndCrit(character.DefaultSpellCritMultiplier()),
-			}),
+			ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+				spell.CalcAndDealDamageMagicHitAndCrit(sim, target, sim.Roll(1530, 1870))
+			},
 		})
 
 		character.AddMajorCooldown(core.MajorCooldown{
@@ -325,7 +325,7 @@ func init() {
 					Duration:  time.Second * 20,
 					MaxStacks: 10,
 				},
-				BonusPerStack: stats.Stats{stats.SpellPower: amount, stats.HealingPower: amount},
+				BonusPerStack: stats.Stats{stats.SpellPower: amount},
 			})
 
 			MakeProcTriggerAura(&character.Unit, ProcTrigger{

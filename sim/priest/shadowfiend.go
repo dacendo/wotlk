@@ -28,6 +28,7 @@ func (priest *Priest) registerShadowfiendSpell() {
 	priest.Shadowfiend = priest.RegisterSpell(core.SpellConfig{
 		ActionID:    actionID,
 		SpellSchool: core.SpellSchoolShadow,
+		ProcMask:    core.ProcMaskEmpty,
 
 		Cast: core.CastConfig{
 			DefaultCast: core.Cast{
@@ -39,13 +40,9 @@ func (priest *Priest) registerShadowfiendSpell() {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:       core.ProcMaskEmpty,
-			OutcomeApplier: priest.OutcomeFuncAlwaysHit(),
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				priest.ShadowfiendAura.Activate(sim)
-			},
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			priest.ShadowfiendAura.Activate(sim)
+		},
 	})
 
 	priest.AddMajorCooldown(core.MajorCooldown{

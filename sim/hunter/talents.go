@@ -34,10 +34,20 @@ func (hunter *Hunter) ApplyTalents() {
 	hunter.AddStat(stats.Parry, core.ParryRatingPerParryChance*1*float64(hunter.Talents.Deflection))
 	hunter.AddStat(stats.Dodge, 1*core.DodgeRatingPerDodgeChance*float64(hunter.Talents.CatlikeReflexes))
 	hunter.PseudoStats.RangedSpeedMultiplier *= 1 + 0.04*float64(hunter.Talents.SerpentsSwiftness)
-	hunter.PseudoStats.RangedDamageDealtMultiplier *= 1 + []float64{0, .01, .03, .05}[hunter.Talents.RangedWeaponSpecialization]
-	hunter.PseudoStats.BonusRangedCritRating += 1 * float64(hunter.Talents.LethalShots) * core.CritRatingPerCritChance
 	hunter.PseudoStats.DamageTakenMultiplier *= 1 - 0.02*float64(hunter.Talents.SurvivalInstincts)
-	hunter.AutoAttacks.RangedEffect.DamageMultiplier *= hunter.markedForDeathMultiplier()
+	hunter.AutoAttacks.RangedConfig.DamageMultiplier *= hunter.markedForDeathMultiplier()
+
+	if hunter.Talents.LethalShots > 0 {
+		hunter.AddBonusRangedCritRating(1 * float64(hunter.Talents.LethalShots) * core.CritRatingPerCritChance)
+	}
+	if hunter.Talents.RangedWeaponSpecialization > 0 {
+		mult := 1 + []float64{0, .01, .03, .05}[hunter.Talents.RangedWeaponSpecialization]
+		hunter.OnSpellRegistered(func(spell *core.Spell) {
+			if spell.ProcMask.Matches(core.ProcMaskRanged) {
+				spell.DamageMultiplier *= mult
+			}
+		})
+	}
 
 	if hunter.Talents.EnduranceTraining > 0 {
 		healthBonus := 0.01 * float64(hunter.Talents.EnduranceTraining)
@@ -169,7 +179,7 @@ func (hunter *Hunter) applyInvigoration() {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeSpecial | core.ProcMaskSpellDamage) {
+			if !spell.ProcMask.Matches(core.ProcMaskMeleeSpecial | core.ProcMaskSpellDamage) {
 				return
 			}
 
@@ -210,7 +220,7 @@ func (hunter *Hunter) applyCobraStrikes() {
 			}
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spellEffect.ProcMask.Matches(core.ProcMaskMeleeSpecial | core.ProcMaskSpellDamage) {
+			if spell.ProcMask.Matches(core.ProcMaskMeleeSpecial | core.ProcMaskSpellDamage) {
 				aura.RemoveStack(sim)
 			}
 		},
@@ -251,7 +261,11 @@ func (hunter *Hunter) applyPiercingShots() {
 	psSpell := hunter.RegisterSpell(core.SpellConfig{
 		ActionID:    actionID,
 		SpellSchool: core.SpellSchoolPhysical,
-		Flags:       core.SpellFlagNoOnCastComplete,
+		ProcMask:    core.ProcMaskEmpty,
+		Flags:       core.SpellFlagNoOnCastComplete | core.SpellFlagIgnoreModifiers,
+
+		DamageMultiplier: 1,
+		ThreatMultiplier: 1,
 
 		ApplyEffects: func(sim *core.Simulation, _ *core.Unit, _ *core.Spell) {
 			psDot.Apply(sim)
@@ -287,20 +301,22 @@ func (hunter *Hunter) applyPiercingShots() {
 			}
 
 			totalDmg := spellEffect.Damage * dmgMultiplier
+			// Specifically account for bleed modifiers, since it still affects the spell
+			// but we're ignoring all modifiers.
+			totalDmg *= spellEffect.Target.PseudoStats.PeriodicPhysicalDamageTakenMultiplier
+
 			if psDot.IsActive() {
 				remainingTicks := 8 - psDot.TickCount
 				totalDmg += currentTickDmg * float64(remainingTicks)
 			}
+
 			currentTickDmg = totalDmg / 8
 
 			// Reassign tick effect to update the damage.
 			psDot.TickEffects = core.TickFuncSnapshot(target, core.SpellEffect{
-				ProcMask:         core.ProcMaskPeriodicDamage,
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
-				IsPeriodic:       true,
-				BaseDamage:       core.BaseDamageConfigFlat(currentTickDmg),
-				OutcomeApplier:   hunter.OutcomeFuncTick(),
+				IsPeriodic:     true,
+				BaseDamage:     core.BaseDamageConfigFlat(currentTickDmg),
+				OutcomeApplier: hunter.OutcomeFuncTick(),
 			})
 
 			psSpell.Cast(sim, spellEffect.Target)
@@ -319,16 +335,18 @@ func (hunter *Hunter) applyWildQuiver() {
 	wqSpell := hunter.RegisterSpell(core.SpellConfig{
 		ActionID:    actionID,
 		SpellSchool: core.SpellSchoolNature,
+		ProcMask:    core.ProcMaskRangedAuto,
 		Flags:       core.SpellFlagNoOnCastComplete,
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskRangedAuto,
-			DamageMultiplier: 0.8,
-			ThreatMultiplier: 1,
+		DamageMultiplier: 0.8,
+		CritMultiplier:   hunter.critMultiplier(false, false, hunter.CurrentTarget),
+		ThreatMultiplier: 1,
 
-			BaseDamage:     core.BaseDamageConfigRangedWeapon(0),
-			OutcomeApplier: hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(false, false, hunter.CurrentTarget)),
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := spell.Unit.RangedWeaponDamage(sim, spell.RangedAttackPower(target)) +
+				spell.BonusWeaponDamage()
+			spell.CalcAndDealDamageRangedHitAndCrit(sim, target, baseDamage)
+		},
 	})
 
 	hunter.RegisterAura(core.Aura{
@@ -486,7 +504,7 @@ func (hunter *Hunter) applyGoForTheThroat() {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskRanged) || !spellEffect.Outcome.Matches(core.OutcomeCrit) {
+			if !spell.ProcMask.Matches(core.ProcMaskRanged) || !spellEffect.Outcome.Matches(core.OutcomeCrit) {
 				return
 			}
 			if !hunter.pet.IsEnabled() {
@@ -506,18 +524,20 @@ func (hunter *Hunter) applyImprovedTracking() {
 
 	hunter.RegisterResetEffect(
 		func(s *core.Simulation) {
-			if !applied {
-				for _, target := range hunter.Env.Encounter.Targets {
-					switch target.MobType {
-					case proto.MobType_MobTypeBeast, proto.MobType_MobTypeDemon,
-						proto.MobType_MobTypeDragonkin, proto.MobType_MobTypeElemental,
-						proto.MobType_MobTypeGiant, proto.MobType_MobTypeHumanoid,
-						proto.MobType_MobTypeUndead:
+			if applied {
+				return
+			}
+			applied = true
 
-						hunter.AttackTables[target.UnitIndex].DamageDealtMultiplier *= 1.0 + 0.01*float64(hunter.Talents.ImprovedTracking)
-					}
+			for _, target := range hunter.Env.Encounter.Targets {
+				switch target.MobType {
+				case proto.MobType_MobTypeBeast, proto.MobType_MobTypeDemon,
+					proto.MobType_MobTypeDragonkin, proto.MobType_MobTypeElemental,
+					proto.MobType_MobTypeGiant, proto.MobType_MobTypeHumanoid,
+					proto.MobType_MobTypeUndead:
+
+					hunter.AttackTables[target.UnitIndex].DamageDealtMultiplier *= 1.0 + 0.01*float64(hunter.Talents.ImprovedTracking)
 				}
-				applied = true
 			}
 		},
 	)
@@ -568,7 +588,7 @@ func (hunter *Hunter) applyLockAndLoad() {
 			aura.Activate(sim)
 		},
 		OnPeriodicDamageDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if spell != hunter.BlackArrow && spell != hunter.ExplosiveTrap {
+			if spell != hunter.BlackArrow && spell != hunter.ExplosiveTrapDot.Spell {
 				return
 			}
 
@@ -601,7 +621,7 @@ func (hunter *Hunter) applyThrillOfTheHunt() {
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 			// mask 256
-			if !spellEffect.ProcMask.Matches(core.ProcMaskRangedSpecial) {
+			if !spell.ProcMask.Matches(core.ProcMaskRangedSpecial) {
 				return
 			}
 
@@ -647,7 +667,20 @@ func (hunter *Hunter) applyExposeWeakness() {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskRanged) && spell != hunter.ExplosiveTrap {
+			if !spell.ProcMask.Matches(core.ProcMaskRanged) && spell != hunter.ExplosiveTrap {
+				return
+			}
+
+			if !spellEffect.Outcome.Matches(core.OutcomeCrit) {
+				return
+			}
+
+			if procChance == 1 || sim.RandomFloat("ExposeWeakness") < procChance {
+				procAura.Activate(sim)
+			}
+		},
+		OnPeriodicDamageDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if !spell.ProcMask.Matches(core.ProcMaskRanged) && spell != hunter.ExplosiveTrapDot.Spell {
 				return
 			}
 
@@ -679,7 +712,7 @@ func (hunter *Hunter) applyMasterTactician() {
 			aura.Activate(sim)
 		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskRanged) || !spellEffect.Landed() {
+			if !spell.ProcMask.Matches(core.ProcMaskRanged) || !spellEffect.Landed() {
 				return
 			}
 
@@ -703,34 +736,34 @@ func (hunter *Hunter) applySniperTraining() {
 	}
 	uptime = core.MinFloat(1, uptime)
 
-	multiplier := 1 + 0.02*float64(hunter.Talents.SniperTraining)
+	dmgMod := .02 * float64(hunter.Talents.SniperTraining)
 
 	stAura := hunter.RegisterAura(core.Aura{
 		Label:    "Sniper Training",
 		ActionID: core.ActionID{SpellID: 53304},
 		Duration: time.Second * 15,
 		OnGain: func(aura *core.Aura, sim *core.Simulation) {
-			hunter.SteadyShot.DamageMultiplier *= multiplier
+			hunter.SteadyShot.DamageMultiplierAdditive += dmgMod
 			if hunter.AimedShot != nil {
-				hunter.AimedShot.DamageMultiplier *= multiplier
+				hunter.AimedShot.DamageMultiplierAdditive += dmgMod
 			}
 			if hunter.BlackArrow != nil {
-				hunter.BlackArrow.DamageMultiplier *= multiplier
+				hunter.BlackArrow.DamageMultiplierAdditive += dmgMod
 			}
 			if hunter.ExplosiveShot != nil {
-				hunter.ExplosiveShot.DamageMultiplier *= multiplier
+				hunter.ExplosiveShot.DamageMultiplierAdditive += dmgMod
 			}
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
-			hunter.SteadyShot.DamageMultiplier /= multiplier
+			hunter.SteadyShot.DamageMultiplierAdditive -= dmgMod
 			if hunter.AimedShot != nil {
-				hunter.AimedShot.DamageMultiplier /= multiplier
+				hunter.AimedShot.DamageMultiplierAdditive -= dmgMod
 			}
 			if hunter.BlackArrow != nil {
-				hunter.BlackArrow.DamageMultiplier /= multiplier
+				hunter.BlackArrow.DamageMultiplierAdditive -= dmgMod
 			}
 			if hunter.ExplosiveShot != nil {
-				hunter.ExplosiveShot.DamageMultiplier /= multiplier
+				hunter.ExplosiveShot.DamageMultiplierAdditive -= dmgMod
 			}
 		},
 	})

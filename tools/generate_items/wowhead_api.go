@@ -15,7 +15,7 @@ import (
 	"github.com/wowsims/wotlk/sim/core/proto"
 )
 
-type Stats [42]float64
+type Stats [34]float64
 
 type ItemResponse interface {
 	GetName() string
@@ -179,13 +179,6 @@ func (item WowheadItemResponse) GetStats() Stats {
 		proto.Stat_StatIntellect:         float64(item.GetIntValue(intellectRegex)),
 		proto.Stat_StatSpirit:            float64(item.GetIntValue(spiritRegex)),
 		proto.Stat_StatSpellPower:        sp,
-		proto.Stat_StatHealingPower:      sp,
-		proto.Stat_StatArcaneSpellPower:  float64(item.GetIntValue(arcaneSpellPowerRegex)),
-		proto.Stat_StatFireSpellPower:    float64(item.GetIntValue(fireSpellPowerRegex)),
-		proto.Stat_StatFrostSpellPower:   float64(item.GetIntValue(frostSpellPowerRegex)),
-		proto.Stat_StatHolySpellPower:    float64(item.GetIntValue(holySpellPowerRegex)),
-		proto.Stat_StatNatureSpellPower:  float64(item.GetIntValue(natureSpellPowerRegex)),
-		proto.Stat_StatShadowSpellPower:  float64(item.GetIntValue(shadowSpellPowerRegex)),
 		proto.Stat_StatSpellHit:          float64(item.GetIntValue(hitRegex)),
 		proto.Stat_StatMeleeHit:          float64(item.GetIntValue(hitRegex)),
 		proto.Stat_StatSpellCrit:         float64(item.GetIntValue(critRegex)),
@@ -543,7 +536,6 @@ func (item WowheadItemResponse) GetSocketBonus() Stats {
 		proto.Stat_StatSpirit:            float64(GetBestRegexIntValue(bonusStr, spiritSocketBonusRegexes, 1)),
 		proto.Stat_StatSpellHaste:        float64(GetBestRegexIntValue(bonusStr, hasteSocketBonusRegexes, 1)),
 		proto.Stat_StatSpellPower:        float64(GetBestRegexIntValue(bonusStr, spellPowerSocketBonusRegexes, 1)),
-		proto.Stat_StatHealingPower:      float64(GetBestRegexIntValue(bonusStr, spellPowerSocketBonusRegexes, 1)),
 		proto.Stat_StatSpellHit:          float64(GetBestRegexIntValue(bonusStr, spellHitSocketBonusRegexes, 1)),
 		proto.Stat_StatMeleeHit:          float64(GetBestRegexIntValue(bonusStr, spellHitSocketBonusRegexes, 1)),
 		proto.Stat_StatSpellCrit:         float64(GetBestRegexIntValue(bonusStr, spellCritSocketBonusRegexes, 1)),
@@ -631,7 +623,6 @@ func (item WowheadItemResponse) GetGemStats() Stats {
 		proto.Stat_StatMeleeHaste: float64(GetBestRegexIntValue(item.Tooltip, hasteGemStatRegexes, 1)),
 
 		proto.Stat_StatSpellPower:        float64(GetBestRegexIntValue(item.Tooltip, spellPowerGemStatRegexes, 1)),
-		proto.Stat_StatHealingPower:      float64(GetBestRegexIntValue(item.Tooltip, spellPowerGemStatRegexes, 1)),
 		proto.Stat_StatAttackPower:       float64(GetBestRegexIntValue(item.Tooltip, attackPowerGemStatRegexes, 1)),
 		proto.Stat_StatRangedAttackPower: float64(GetBestRegexIntValue(item.Tooltip, attackPowerGemStatRegexes, 1)),
 		proto.Stat_StatArmorPenetration:  float64(GetBestRegexIntValue(item.Tooltip, armorPenetrationGemStatRegexes, 1)),
@@ -655,7 +646,17 @@ func (item WowheadItemResponse) GetGemStats() Stats {
 var itemSetNameRegex = regexp.MustCompile("<a href=\\\"\\/wotlk/item-set=-?([0-9]+)/(.*)\\\" class=\\\"q\\\">([^<]+)<")
 
 func (item WowheadItemResponse) GetItemSetName() string {
-	return strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(item.GetTooltipRegexString(itemSetNameRegex, 3), "Heroes' "), "Valorous "), "Conqueror's "), "Triumphant "), "Sanctified ")
+	original := item.GetTooltipRegexString(itemSetNameRegex, 3)
+
+	// Strip out the 10/25 man prefixes from set names
+	withoutTier := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(original, "Heroes' "), "Valorous "), "Conqueror's "), "Triumphant "), "Sanctified ")
+	if original != withoutTier { // if we found a tier prefix, return now.
+		return withoutTier
+	}
+
+	// Now strip out the season prefix from any pvp set names
+	withoutPvp := strings.Replace(strings.Replace(strings.Replace(strings.Replace(strings.Replace(strings.Replace(original, "Savage Glad", "Glad", 1), "Hateful Glad", "Glad", 1), "Deadly Glad", "Glad", 1), "Furious Glad", "Glad", 1), "Relentless Glad", "Glad", 1), "Wrathful Glad", "Glad", 1)
+	return withoutPvp
 }
 
 func getWowheadItemResponse(itemID int, tooltipsDB map[int]string) WowheadItemResponse {

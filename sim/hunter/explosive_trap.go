@@ -11,28 +11,12 @@ import (
 func (hunter *Hunter) registerExplosiveTrapSpell(timer *core.Timer) {
 	actionID := core.ActionID{SpellID: 49067}
 	baseCost := 0.19 * hunter.BaseMana
-
-	applyAOEDamage := core.ApplyEffectFuncAOEDamageCapped(hunter.Env, core.SpellEffect{
-		ProcMask: core.ProcMaskSpellDamage,
-
-		BonusSpellHitRating: float64(hunter.Talents.SurvivalTactics) * 2 * core.SpellHitRatingPerHitChance,
-		DamageMultiplier: 1 *
-			(1 + 0.02*float64(hunter.Talents.TNT)),
-		ThreatMultiplier: 1,
-
-		BaseDamage: core.BaseDamageConfig{
-			Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-				rap := hitEffect.RangedAttackPower(spell.Unit) + hitEffect.RangedAttackPowerOnTarget()
-				return core.DamageRoll(sim, 523, 671) + rap*0.1
-			},
-		},
-		OutcomeApplier: hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(false, false, hunter.CurrentTarget)),
-	})
+	hasGlyph := hunter.HasMajorGlyph(proto.HunterMajorGlyph_GlyphOfExplosiveTrap)
 
 	hunter.ExplosiveTrap = hunter.RegisterSpell(core.SpellConfig{
-		ActionID:    actionID,
-		SpellSchool: core.SpellSchoolFire,
-
+		ActionID:     actionID,
+		SpellSchool:  core.SpellSchoolFire,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -49,19 +33,38 @@ func (hunter *Hunter) registerExplosiveTrapSpell(timer *core.Timer) {
 			},
 		},
 
+		DamageMultiplierAdditive: 1 +
+			.02*float64(hunter.Talents.TNT),
+		CritMultiplier:   hunter.critMultiplier(false, false, hunter.CurrentTarget),
+		ThreatMultiplier: 1,
+
 		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
-			applyAOEDamage(sim, target, spell)
+			for _, aoeTarget := range sim.Encounter.Targets {
+				baseDamage := sim.Roll(523, 671) + 0.1*spell.RangedAttackPower(&aoeTarget.Unit)
+				baseDamage *= sim.Encounter.AOECapMultiplier()
+				spell.CalcAndDealDamageRangedHitAndCrit(sim, &aoeTarget.Unit, baseDamage)
+			}
 			hunter.ExplosiveTrapDot.Apply(sim)
 		},
 	})
 
 	periodicOutcomeFunc := hunter.OutcomeFuncRangedHit()
-	if hunter.HasMajorGlyph(proto.HunterMajorGlyph_GlyphOfExplosiveTrap) {
-		periodicOutcomeFunc = hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(false, false, hunter.CurrentTarget))
+	if hasGlyph {
+		periodicOutcomeFunc = hunter.OutcomeFuncRangedHitAndCrit()
 	}
 
 	hunter.ExplosiveTrapDot = core.NewDot(core.Dot{
-		Spell: hunter.ExplosiveTrap,
+		Spell: hunter.RegisterSpell(core.SpellConfig{
+			ActionID:    actionID,
+			SpellSchool: core.SpellSchoolFire,
+			ProcMask:    core.ProcMaskSpellDamage,
+
+			DamageMultiplierAdditive: 1 +
+				.10*float64(hunter.Talents.TrapMastery) +
+				.02*float64(hunter.Talents.TNT),
+			CritMultiplier:   hunter.critMultiplier(false, false, hunter.CurrentTarget),
+			ThreatMultiplier: 1,
+		}),
 		Aura: hunter.RegisterAura(core.Aura{
 			Label:    "Explosive Trap",
 			ActionID: actionID,
@@ -69,22 +72,14 @@ func (hunter *Hunter) registerExplosiveTrapSpell(timer *core.Timer) {
 		NumberOfTicks: 10,
 		TickLength:    time.Second * 2,
 		TickEffects: core.TickFuncAOESnapshot(hunter.Env, core.SpellEffect{
-			ProcMask: core.ProcMaskPeriodicDamage,
-
-			BonusSpellHitRating: float64(hunter.Talents.SurvivalTactics) * 2 * core.SpellHitRatingPerHitChance,
-			DamageMultiplier: 1 *
-				(1 + 0.02*float64(hunter.Talents.TNT)) *
-				(1 + 0.1*float64(hunter.Talents.TrapMastery)),
-			ThreatMultiplier: 1,
+			IsPeriodic: true,
 
 			BaseDamage: core.BaseDamageConfig{
 				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					rap := hitEffect.RangedAttackPower(spell.Unit) + hitEffect.RangedAttackPowerOnTarget()
-					return 90 + rap*0.1
+					return 90 + 0.1*spell.RangedAttackPower(hitEffect.Target)
 				},
 			},
 			OutcomeApplier: periodicOutcomeFunc,
-			IsPeriodic:     true,
 		}),
 	})
 

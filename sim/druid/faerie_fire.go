@@ -14,7 +14,6 @@ func (druid *Druid) registerFaerieFireSpell() {
 	gcd := core.GCDDefault
 	ignoreHaste := false
 	cd := core.Cooldown{}
-	baseDamage := core.BaseDamageConfigMelee(0, 0, 0)
 
 	if druid.InForm(Cat | Bear) {
 		actionID = core.ActionID{SpellID: 16857}
@@ -28,16 +27,12 @@ func (druid *Druid) registerFaerieFireSpell() {
 		}
 	}
 
-	if druid.InForm(Bear) {
-		baseDamage = core.BaseDamageConfigMelee(1, 1, 0.15)
-	}
-
 	druid.FaerieFireAura = core.FaerieFireAura(druid.CurrentTarget, druid.Talents.ImprovedFaerieFire > 0)
 
 	druid.FaerieFire = druid.RegisterSpell(core.SpellConfig{
-		ActionID:    actionID,
-		SpellSchool: core.SpellSchoolNature,
-
+		ActionID:     actionID,
+		SpellSchool:  core.SpellSchoolNature,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: resourceType,
 		BaseCost:     baseCost,
 
@@ -50,18 +45,21 @@ func (druid *Druid) registerFaerieFireSpell() {
 			CD:          cd,
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskSpellDamage,
-			BaseDamage:       baseDamage,
-			ThreatMultiplier: 1,
-			FlatThreatBonus:  66 * 2,
-			OutcomeApplier:   druid.OutcomeFuncMagicHit(),
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() {
-					druid.FaerieFireAura.Activate(sim)
-				}
-			},
-		}),
+		ThreatMultiplier: 1,
+		FlatThreatBonus:  66 * 2,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := 0.0
+			if druid.InForm(Bear) {
+				baseDamage = 1 + 0.15*spell.MeleeAttackPower()
+			}
+
+			result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHit)
+			if result.Landed() {
+				druid.FaerieFireAura.Activate(sim)
+			}
+			spell.DealDamage(sim, &result)
+		},
 	})
 }
 

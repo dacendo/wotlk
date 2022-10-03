@@ -9,12 +9,12 @@ import (
 var DeathCoilActionID = core.ActionID{SpellID: 49895}
 
 func (dk *Deathknight) registerDeathCoilSpell() {
-	baseDamage := 443.0 + dk.sigilOfTheWildBuckBonus() + dk.sigilOfTheVengefulHeartDeathCoil()
+	bonusFlatDamage := 443 + dk.sigilOfTheWildBuckBonus() + dk.sigilOfTheVengefulHeartDeathCoil()
 	baseCost := float64(core.NewRuneCost(40, 0, 0, 0, 0))
 	dk.DeathCoil = dk.RegisterSpell(nil, core.SpellConfig{
-		ActionID:    DeathCoilActionID,
-		SpellSchool: core.SpellSchoolShadow,
-
+		ActionID:     DeathCoilActionID,
+		SpellSchool:  core.SpellSchoolShadow,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.RunicPower,
 		BaseCost:     baseCost,
 
@@ -33,53 +33,44 @@ func (dk *Deathknight) registerDeathCoilSpell() {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:             core.ProcMaskSpellDamage,
-			BonusSpellCritRating: dk.darkrunedBattlegearCritBonus() * core.CritRatingPerCritChance,
-			DamageMultiplier: (1.0 + float64(dk.Talents.Morbidity)*0.05) *
-				core.TernaryFloat64(dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDarkDeath), 1.15, 1.0),
-			ThreatMultiplier: 1.0,
+		BonusCritRating: dk.darkrunedBattlegearCritBonus() * core.CritRatingPerCritChance,
+		DamageMultiplier: 1 *
+			(1.0 + float64(dk.Talents.Morbidity)*0.05) *
+			core.TernaryFloat64(dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDarkDeath), 1.15, 1.0),
+		CritMultiplier:   dk.DefaultMeleeCritMultiplier(),
+		ThreatMultiplier: 1.0,
 
-			BaseDamage: core.BaseDamageConfig{
-				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					return (baseDamage + dk.getImpurityBonus(hitEffect, spell.Unit)*0.15) * dk.RoRTSBonus(hitEffect.Target)
-				},
-				TargetSpellCoefficient: 1,
-			},
-			OutcomeApplier: dk.OutcomeFuncMagicHitAndCrit(dk.spellCritMultiplier()),
-
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				dk.LastOutcome = spellEffect.Outcome
-				if spellEffect.Landed() && dk.Talents.UnholyBlight {
-					dk.procUnholyBlight(sim, spellEffect.Target, spellEffect.Damage)
-				}
-			},
-		}),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := (bonusFlatDamage + 0.15*dk.getImpurityBonus(spell)) * dk.RoRTSBonus(target)
+			result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCrit)
+			if result.Landed() && dk.Talents.UnholyBlight {
+				dk.procUnholyBlight(sim, target, result.Damage)
+			}
+			spell.DealDamage(sim, &result)
+		},
 	}, func(sim *core.Simulation) bool {
 		return dk.CastCostPossible(sim, 40.0, 0, 0, 0) && dk.DeathCoil.IsReady(sim)
 	}, nil)
 }
 
 func (dk *Deathknight) registerDrwDeathCoilSpell() {
-	baseDamage := 443.0 + dk.sigilOfTheWildBuckBonus() + dk.sigilOfTheVengefulHeartDeathCoil()
+	bonusFlatDamage := 443 + dk.sigilOfTheWildBuckBonus() + dk.sigilOfTheVengefulHeartDeathCoil()
 
 	dk.RuneWeapon.DeathCoil = dk.RuneWeapon.RegisterSpell(core.SpellConfig{
 		ActionID:    DeathCoilActionID,
 		SpellSchool: core.SpellSchoolShadow,
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:             core.ProcMaskSpellDamage,
-			BonusSpellCritRating: dk.darkrunedBattlegearCritBonus() * core.CritRatingPerCritChance,
-			DamageMultiplier: (1.0 + float64(dk.Talents.Morbidity)*0.05) *
-				core.TernaryFloat64(dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDarkDeath), 1.15, 1.0),
-			ThreatMultiplier: 1.0,
+		ProcMask:    core.ProcMaskSpellDamage,
 
-			BaseDamage: core.BaseDamageConfig{
-				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					return (baseDamage + dk.RuneWeapon.getImpurityBonus(hitEffect, spell.Unit)*0.15)
-				},
-				TargetSpellCoefficient: 1,
-			},
-			OutcomeApplier: dk.RuneWeapon.OutcomeFuncMagicHitAndCrit(dk.RuneWeapon.MeleeCritMultiplier(1.0, 0.0)),
-		}),
+		BonusCritRating: dk.darkrunedBattlegearCritBonus() * core.CritRatingPerCritChance,
+		DamageMultiplier: 1 *
+			(1.0 + float64(dk.Talents.Morbidity)*0.05) *
+			core.TernaryFloat64(dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDarkDeath), 1.15, 1.0),
+		CritMultiplier:   dk.RuneWeapon.DefaultMeleeCritMultiplier(),
+		ThreatMultiplier: 1.0,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := bonusFlatDamage + 0.15*dk.RuneWeapon.getImpurityBonus(spell)
+			spell.CalcAndDealDamageMagicHitAndCrit(sim, target, baseDamage)
+		},
 	})
 }

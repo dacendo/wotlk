@@ -23,6 +23,9 @@ type Encounter struct {
 	DamageTaken float64
 	// In health fight: set to true until we get something to base on
 	DurationIsEstimate bool
+
+	// Value to multiply by, for damage spells which are subject to the aoe cap.
+	aoeCapMultiplier float64
 }
 
 func NewEncounter(options proto.Encounter) Encounter {
@@ -75,7 +78,16 @@ func NewEncounter(options proto.Encounter) Encounter {
 		encounter.DurationIsEstimate = true
 	}
 
+	encounter.updateAOECapMultiplier()
+
 	return encounter
+}
+
+func (encounter *Encounter) AOECapMultiplier() float64 {
+	return encounter.aoeCapMultiplier
+}
+func (encounter *Encounter) updateAOECapMultiplier() {
+	encounter.aoeCapMultiplier = MinFloat(10/float64(len(encounter.Targets)), 1)
 }
 
 func (encounter *Encounter) doneIteration(sim *Simulation) {
@@ -137,9 +149,8 @@ func NewTarget(options proto.Target, targetIndex int32) *Target {
 	}
 
 	if target.Level == defaultRaidBossLevel && options.SuppressDodge {
-		// Sunwell boss Dodge Suppression. -20% dodge and -5% miss chance.
+		// ICC boss Dodge Suppression. -20% dodge only.
 		target.PseudoStats.DodgeReduction += 0.2
-		target.PseudoStats.IncreasedMissChance -= 0.05
 	}
 
 	target.PseudoStats.CanBlock = true
@@ -209,24 +220,12 @@ type AttackTable struct {
 	GlanceMultiplier float64
 	CritSuppression  float64
 
-	PartialResistArcaneRollThreshold00 float64
-	PartialResistArcaneRollThreshold25 float64
-	PartialResistArcaneRollThreshold50 float64
-	PartialResistHolyRollThreshold00   float64
-	PartialResistHolyRollThreshold25   float64
-	PartialResistHolyRollThreshold50   float64
-	PartialResistFireRollThreshold00   float64
-	PartialResistFireRollThreshold25   float64
-	PartialResistFireRollThreshold50   float64
-	PartialResistFrostRollThreshold00  float64
-	PartialResistFrostRollThreshold25  float64
-	PartialResistFrostRollThreshold50  float64
-	PartialResistNatureRollThreshold00 float64
-	PartialResistNatureRollThreshold25 float64
-	PartialResistNatureRollThreshold50 float64
-	PartialResistShadowRollThreshold00 float64
-	PartialResistShadowRollThreshold25 float64
-	PartialResistShadowRollThreshold50 float64
+	PartialResistArcaneThresholds Thresholds
+	PartialResistHolyThresholds   Thresholds
+	PartialResistFireThresholds   Thresholds
+	PartialResistFrostThresholds  Thresholds
+	PartialResistNatureThresholds Thresholds
+	PartialResistShadowThresholds Thresholds
 
 	BinaryArcaneHitChance float64
 	BinaryHolyHitChance   float64
@@ -235,11 +234,10 @@ type AttackTable struct {
 	BinaryNatureHitChance float64
 	BinaryShadowHitChance float64
 
-	ArmorDamageModifier float64
-
 	DamageDealtMultiplier               float64
 	NatureDamageDealtMultiplier         float64
 	PeriodicShadowDamageDealtMultiplier float64
+	HealingDealtMultiplier              float64
 }
 
 func NewAttackTable(attacker *Unit, defender *Unit) *AttackTable {
@@ -250,10 +248,11 @@ func NewAttackTable(attacker *Unit, defender *Unit) *AttackTable {
 		DamageDealtMultiplier:               1,
 		NatureDamageDealtMultiplier:         1,
 		PeriodicShadowDamageDealtMultiplier: 1,
+		HealingDealtMultiplier:              1,
 	}
 
 	if defender.Type == EnemyUnit {
-		// Assumes attacker (the Player) is level 70.
+		// Assumes attacker (the Player) is level 80.
 		table.BaseSpellMissChance = UnitLevelFloat64(defender.Level, 0.04, 0.05, 0.06, 0.17)
 		table.BaseMissChance = UnitLevelFloat64(defender.Level, 0.05, 0.055, 0.06, 0.08)
 		table.BaseBlockChance = 0.05
@@ -264,7 +263,7 @@ func NewAttackTable(attacker *Unit, defender *Unit) *AttackTable {
 		table.GlanceMultiplier = UnitLevelFloat64(defender.Level, 0.95, 0.95, 0.85, 0.75)
 		table.CritSuppression = UnitLevelFloat64(defender.Level, 0, 0.01, 0.02, 0.048)
 	} else {
-		// Assumes defender (the Player) is level 70.
+		// Assumes defender (the Player) is level 80.
 		table.BaseSpellMissChance = 0.05
 		table.BaseMissChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
 		table.BaseBlockChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
@@ -272,7 +271,6 @@ func NewAttackTable(attacker *Unit, defender *Unit) *AttackTable {
 		table.BaseParryChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
 	}
 
-	table.UpdateArmorDamageReduction()
 	table.UpdatePartialResists()
 
 	return table

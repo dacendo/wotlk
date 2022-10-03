@@ -55,18 +55,17 @@ func (dk *Deathknight) registerAntiMagicShellSpell() {
 					targetDummySpell = aura.Unit.CurrentTarget.RegisterSpell(core.SpellConfig{
 						ActionID:    core.ActionID{SpellID: 49375},
 						SpellSchool: core.SpellSchoolMagic,
+						ProcMask:    core.ProcMaskSpellDamage,
 						Flags:       core.SpellFlagNoOnCastComplete | core.SpellFlagNoMetrics,
 
 						Cast: core.CastConfig{},
 
-						ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-							ProcMask: core.ProcMaskSpellDamage,
+						DamageMultiplier: 1,
 
-							DamageMultiplier: 1,
-
-							BaseDamage:     core.BaseDamageConfigRoll(dk.Inputs.AvgAMSHit*0.9, dk.Inputs.AvgAMSHit*1.1),
-							OutcomeApplier: target.OutcomeFuncAlwaysHit(),
-						}),
+						ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+							baseDamage := dk.Inputs.AvgAMSHit * sim.Roll(0.9, 1.1)
+							spell.CalcAndDealDamageAlwaysHit(sim, target, baseDamage)
+						},
 					})
 				}
 
@@ -82,13 +81,13 @@ func (dk *Deathknight) registerAntiMagicShellSpell() {
 			}
 
 			dk.PseudoStats.PhysicalDamageTakenMultiplier *= physDmgTakenMult
+			dk.PseudoStats.PeriodicPhysicalDamageTakenMultiplier *= physDmgTakenMult
 			dk.PseudoStats.ArcaneDamageTakenMultiplier *= spellDmgTakenMult
 			dk.PseudoStats.FireDamageTakenMultiplier *= spellDmgTakenMult
 			dk.PseudoStats.FrostDamageTakenMultiplier *= spellDmgTakenMult
 			dk.PseudoStats.HolyDamageTakenMultiplier *= spellDmgTakenMult
 			dk.PseudoStats.NatureDamageTakenMultiplier *= spellDmgTakenMult
 			dk.PseudoStats.ShadowDamageTakenMultiplier *= spellDmgTakenMult
-			dk.PseudoStats.PeriodicPhysicalDamageTakenMultiplier *= physDmgTakenMult
 			dk.PseudoStats.PeriodicShadowDamageTakenMultiplier *= spellDmgTakenMult
 
 			rs.DoCost(sim)
@@ -96,13 +95,13 @@ func (dk *Deathknight) registerAntiMagicShellSpell() {
 
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
 			dk.PseudoStats.PhysicalDamageTakenMultiplier /= physDmgTakenMult
+			dk.PseudoStats.PeriodicPhysicalDamageTakenMultiplier /= physDmgTakenMult
 			dk.PseudoStats.ArcaneDamageTakenMultiplier /= spellDmgTakenMult
 			dk.PseudoStats.FireDamageTakenMultiplier /= spellDmgTakenMult
 			dk.PseudoStats.FrostDamageTakenMultiplier /= spellDmgTakenMult
 			dk.PseudoStats.HolyDamageTakenMultiplier /= spellDmgTakenMult
 			dk.PseudoStats.NatureDamageTakenMultiplier /= spellDmgTakenMult
 			dk.PseudoStats.ShadowDamageTakenMultiplier /= spellDmgTakenMult
-			dk.PseudoStats.PeriodicPhysicalDamageTakenMultiplier /= physDmgTakenMult
 			dk.PseudoStats.PeriodicShadowDamageTakenMultiplier /= spellDmgTakenMult
 		},
 

@@ -18,7 +18,6 @@ func (dk *Deathknight) registerIcyTouchSpell() {
 		dk.FrostFeverDebuffAura[target.Index] = ffAura
 	}
 
-	impIcyTouchCoeff := 1.0 + 0.05*float64(dk.Talents.ImprovedIcyTouch)
 	sigilBonus := dk.sigilOfTheFrozenConscienceBonus()
 	amountOfRunicPower := 10.0 + 2.5*float64(dk.Talents.ChillOfTheGrave)
 	baseCost := float64(core.NewRuneCost(uint8(amountOfRunicPower), 0, 1, 0, 0))
@@ -27,8 +26,10 @@ func (dk *Deathknight) registerIcyTouchSpell() {
 	dk.IcyTouch = dk.RegisterSpell(rs, core.SpellConfig{
 		ActionID:     IcyTouchActionID,
 		SpellSchool:  core.SpellSchoolFrost,
+		ProcMask:     core.ProcMaskSpellDamage,
 		ResourceType: stats.RunicPower,
 		BaseCost:     baseCost,
+
 		Cast: core.CastConfig{
 			DefaultCast: core.Cast{
 				Cost: baseCost,
@@ -39,23 +40,22 @@ func (dk *Deathknight) registerIcyTouchSpell() {
 			},
 		},
 
-		ApplyEffects: dk.withRuneRefund(rs, core.SpellEffect{
-			ProcMask:             core.ProcMaskSpellDamage,
-			BonusSpellCritRating: dk.rimeCritBonus() * core.CritRatingPerCritChance,
-			DamageMultiplier:     impIcyTouchCoeff,
-			ThreatMultiplier:     7.0,
+		BonusCritRating:  dk.rimeCritBonus() * core.CritRatingPerCritChance,
+		DamageMultiplier: 1 + 0.05*float64(dk.Talents.ImprovedIcyTouch),
+		CritMultiplier:   dk.DefaultMeleeCritMultiplier(),
+		ThreatMultiplier: 7,
 
+		ApplyEffects: dk.withRuneRefund(rs, core.SpellEffect{
 			BaseDamage: core.BaseDamageConfig{
 				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
 					roll := (245.0-227.0)*sim.RandomFloat("Icy Touch") + 227.0 + sigilBonus
-					return (roll + dk.getImpurityBonus(hitEffect, spell.Unit)*0.1) *
+					return (roll + 0.1*dk.getImpurityBonus(spell)) *
 						dk.glacielRotBonus(hitEffect.Target) *
 						dk.RoRTSBonus(hitEffect.Target) *
 						dk.mercilessCombatBonus(sim)
 				},
-				TargetSpellCoefficient: 1,
 			},
-			OutcomeApplier: dk.killingMachineOutcomeMod(dk.OutcomeFuncMagicHitAndCrit(dk.spellCritMultiplier())),
+			OutcomeApplier: dk.killingMachineOutcomeMod(dk.OutcomeFuncMagicHitAndCrit()),
 
 			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 				dk.LastOutcome = spellEffect.Outcome
@@ -80,33 +80,27 @@ func (dk *Deathknight) registerIcyTouchSpell() {
 	}, nil)
 }
 func (dk *Deathknight) registerDrwIcyTouchSpell() {
-	impIcyTouchCoeff := 1.0 + 0.05*float64(dk.Talents.ImprovedIcyTouch)
 	sigilBonus := dk.sigilOfTheFrozenConscienceBonus()
 
 	dk.RuneWeapon.IcyTouch = dk.RuneWeapon.RegisterSpell(core.SpellConfig{
 		ActionID:    IcyTouchActionID,
 		SpellSchool: core.SpellSchoolFrost,
+		ProcMask:    core.ProcMaskSpellDamage,
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:             core.ProcMaskSpellDamage,
-			BonusSpellCritRating: dk.rimeCritBonus() * core.CritRatingPerCritChance,
-			DamageMultiplier:     impIcyTouchCoeff,
-			ThreatMultiplier:     7.0,
+		BonusCritRating:  dk.rimeCritBonus() * core.CritRatingPerCritChance,
+		DamageMultiplier: 1 + 0.05*float64(dk.Talents.ImprovedIcyTouch),
+		CritMultiplier:   dk.RuneWeapon.DefaultMeleeCritMultiplier(),
+		ThreatMultiplier: 7,
 
-			BaseDamage: core.BaseDamageConfig{
-				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
-					roll := (245.0-227.0)*sim.RandomFloat("Icy Touch") + 227.0 + sigilBonus
-					return (roll + dk.RuneWeapon.getImpurityBonus(hitEffect, spell.Unit)*0.1)
-				},
-				TargetSpellCoefficient: 1,
-			},
-			OutcomeApplier: dk.RuneWeapon.OutcomeFuncMagicHitAndCrit(dk.RuneWeapon.MeleeCritMultiplier(1.0, 0.0)),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			roll := (245.0-227.0)*sim.RandomFloat("Icy Touch") + 227.0 + sigilBonus
+			baseDamage := roll + 0.1*dk.RuneWeapon.getImpurityBonus(spell)
 
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() {
-					dk.RuneWeapon.FrostFeverSpell.Cast(sim, spellEffect.Target)
-				}
-			},
-		}),
+			result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCrit)
+			if result.Landed() {
+				dk.RuneWeapon.FrostFeverSpell.Cast(sim, target)
+			}
+			spell.DealDamage(sim, &result)
+		},
 	})
 }

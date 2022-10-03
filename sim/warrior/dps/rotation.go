@@ -38,9 +38,9 @@ func (war *DpsWarrior) doRotation(sim *core.Simulation) {
 			}
 		}
 	} else {
-		if war.Talents.Bloodthirst {
+		if war.Rotation.StanceOption == proto.Warrior_Rotation_BerserkerStance {
 			war.trySwapToBerserker(sim)
-		} else if war.Talents.MortalStrike {
+		} else if war.Rotation.StanceOption == proto.Warrior_Rotation_BattleStance {
 			war.trySwapToBattle(sim)
 		}
 	}
@@ -123,7 +123,7 @@ func (war *DpsWarrior) normalRotation(sim *core.Simulation) {
 
 func (war *DpsWarrior) executeRotation(sim *core.Simulation) {
 	if war.GCD.IsReady(sim) {
-		if war.ShouldInstantSlam(sim) {
+		if war.Rotation.UseSlamOverExecute && war.ShouldInstantSlam(sim) {
 			war.CastSlam(sim, war.CurrentTarget)
 		} else if war.ShouldOverpower(sim) {
 			if !war.StanceMatches(warrior.BattleStance) {
@@ -156,8 +156,6 @@ func (war *DpsWarrior) executeRotation(sim *core.Simulation) {
 			war.Execute.Cast(sim, war.CurrentTarget)
 		} else if war.Rotation.UseMs && war.CanMortalStrike(sim) && war.CurrentRage() >= war.Rotation.MsRageThreshold {
 			war.MortalStrike.Cast(sim, war.CurrentTarget)
-		} else if war.Rotation.UseSlamOverExecute && war.ShouldSlam(sim) && war.CurrentRage() >= war.Rotation.SlamRageThreshold {
-			war.CastSlam(sim, war.CurrentTarget)
 		} else if war.CanExecute() {
 			war.Execute.Cast(sim, war.CurrentTarget)
 		} else if war.ShouldBerserkerRage(sim) {

@@ -110,7 +110,7 @@ var ItemSetWindrunnersPursuit = core.NewItemSet(core.ItemSet{
 					aura.Activate(sim)
 				},
 				OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-					if !spellEffect.Landed() || !spellEffect.ProcMask.Matches(core.ProcMaskRanged) {
+					if !spellEffect.Landed() || !spell.ProcMask.Matches(core.ProcMaskRanged) {
 						return
 					}
 					if !icd.IsReady(sim) {
@@ -217,13 +217,23 @@ func init() {
 
 			var rangedSpell *core.Spell
 			initSpell := func() {
-				rangedEffect := hunter.AutoAttacks.RangedEffect
-				rangedEffect.DamageMultiplier *= 0.5
-				rangedSpell = hunter.GetOrRegisterSpell(core.SpellConfig{
-					ActionID:     core.ActionID{ItemID: itemID},
-					SpellSchool:  core.SpellSchoolPhysical,
-					Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagNoOnCastComplete,
-					ApplyEffects: core.ApplyEffectFuncDirectDamage(rangedEffect),
+				rangedSpell = hunter.RegisterSpell(core.SpellConfig{
+					ActionID:    core.ActionID{ItemID: itemID},
+					SpellSchool: core.SpellSchoolPhysical,
+					ProcMask:    core.ProcMaskRangedAuto,
+					Flags:       core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage | core.SpellFlagNoOnCastComplete,
+
+					DamageMultiplier: 0.5,
+					CritMultiplier:   hunter.AutoAttacks.RangedConfig.CritMultiplier,
+					ThreatMultiplier: 1,
+
+					ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+						baseDamage := hunter.RangedWeaponDamage(sim, spell.RangedAttackPower(target)) +
+							hunter.AmmoDamageBonus +
+							spell.BonusWeaponDamage()
+
+						spell.CalcAndDealDamageRangedHitAndCrit(sim, target, baseDamage)
+					},
 				})
 			}
 

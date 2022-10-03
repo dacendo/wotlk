@@ -10,23 +10,60 @@ import (
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
-var lavaBurstActionID = core.ActionID{SpellID: 60043}
-
-// newLavaBurstSpell returns a precomputed instance of lightning bolt to use for casting.
-func (shaman *Shaman) newLavaBurstSpell() *core.Spell {
+func (shaman *Shaman) registerLavaBurstSpell() {
+	actionID := core.ActionID{SpellID: 60043}
 	baseCost := baseMana * 0.1
+	dmgBonus := core.TernaryFloat64(shaman.Equip[items.ItemSlotRanged].ID == VentureCoLightningRod, 121, 0) +
+		core.TernaryFloat64(shaman.Equip[items.ItemSlotRanged].ID == ThunderfallTotem, 215, 0)
+	spellCoeff := 0.5714 +
+		0.05*float64(shaman.Talents.Shamanism) +
+		core.TernaryFloat64(shaman.HasMajorGlyph(proto.ShamanMajorGlyph_GlyphOfLava), 0.1, 0)
 
-	spellConfig := core.SpellConfig{
-		ActionID:     lavaBurstActionID,
+	applyDot := shaman.HasSetBonus(ItemSetThrallsRegalia, 4)
+	lvbdotDmg := 0.0 // dynamically changing dmg
+	var lvbDot *core.Dot
+	if applyDot {
+		dotSpell := shaman.RegisterSpell(core.SpellConfig{
+			ActionID: core.ActionID{SpellID: 71824},
+			// TODO: No spell school?
+			ProcMask: core.ProcMaskEmpty,
+			Flags:    core.SpellFlagIgnoreModifiers,
+
+			DamageMultiplier: 1,
+			ThreatMultiplier: 1,
+		})
+		lvbDot = core.NewDot(core.Dot{
+			Spell: dotSpell,
+			Aura: shaman.CurrentTarget.RegisterAura(core.Aura{
+				Label:    "LavaBursted-" + strconv.Itoa(int(shaman.Index)),
+				ActionID: core.ActionID{SpellID: 71824},
+			}),
+			TickLength:    time.Second * 2,
+			NumberOfTicks: 3,
+			TickEffects: core.TickFuncSnapshot(shaman.CurrentTarget, core.SpellEffect{
+				BaseDamage: core.BaseDamageConfig{
+					Calculator: func(_ *core.Simulation, _ *core.SpellEffect, _ *core.Spell) float64 {
+						return lvbdotDmg / 3 //spread dot over 3 ticks
+					},
+				},
+				IsPeriodic:     true,
+				OutcomeApplier: shaman.OutcomeFuncTick(),
+			}),
+		})
+	}
+
+	shaman.LavaBurst = shaman.RegisterSpell(core.SpellConfig{
+		ActionID:     actionID,
 		SpellSchool:  core.SpellSchoolFire,
+		ProcMask:     core.ProcMaskSpellDamage,
 		Flags:        SpellFlagFocusable,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
 		Cast: core.CastConfig{
 			DefaultCast: core.Cast{
-				Cost:     baseCost,
-				CastTime: time.Second * 2,
+				Cost:     baseCost * (1 - float64(shaman.Talents.Convection)*0.02),
+				CastTime: time.Second*2 - time.Millisecond*100*time.Duration(shaman.Talents.LightningMastery),
 				GCD:      core.GCDDefault,
 			},
 			CD: core.Cooldown{
@@ -42,92 +79,21 @@ func (shaman *Shaman) newLavaBurstSpell() *core.Spell {
 				}
 			},
 		},
-	}
 
-	if shaman.Talents.LightningMastery > 0 {
-		// Convection applies against the base cost of the spell.
-		spellConfig.Cast.DefaultCast.Cost -= baseCost * float64(shaman.Talents.Convection) * 0.02
-		spellConfig.Cast.DefaultCast.CastTime -= time.Millisecond * 100 * time.Duration(shaman.Talents.LightningMastery)
-	}
+		BonusHitRating:   float64(shaman.Talents.ElementalPrecision) * core.SpellHitRatingPerHitChance,
+		DamageMultiplier: 1 * (1 + 0.01*float64(shaman.Talents.Concussion)) * (1.0 + 0.02*float64(shaman.Talents.CallOfFlame)),
+		// TODO: does lava flows multiply or add with elemental fury? Only matters if you had <5pts which probably won't happen.
+		CritMultiplier:   shaman.ElementalCritMultiplier([]float64{0, 0.06, 0.12, 0.24}[shaman.Talents.LavaFlows] + core.TernaryFloat64(shaman.HasSetBonus(ItemSetEarthShatterGarb, 4), 0.1, 0)),
+		ThreatMultiplier: 1 - (0.1/3)*float64(shaman.Talents.ElementalPrecision),
 
-	lavaflowBonus := []float64{0, 0.06, 0.12, 0.24}
-	// TODO: does lava flows multiply or add with elemental fury? Only matters if you had <5pts which probably won't happen.
-	critBonus := lavaflowBonus[shaman.Talents.LavaFlows]
-	if shaman.HasSetBonus(ItemSetEarthShatterGarb, 4) {
-		critBonus += 0.1
-	}
-	critMultiplier := shaman.ElementalCritMultiplier(critBonus)
-
-	bonusBase := core.TernaryFloat64(shaman.Equip[items.ItemSlotRanged].ID == VentureCoLightningRod, 121, 0) +
-		core.TernaryFloat64(shaman.Equip[items.ItemSlotRanged].ID == ThunderfallTotem, 215, 0)
-
-	bonusCoeff := 0.0
-	if shaman.HasMajorGlyph(proto.ShamanMajorGlyph_GlyphOfLava) {
-		bonusCoeff = 0.1
-	}
-	effect := core.SpellEffect{
-		ProcMask:             core.ProcMaskSpellDamage,
-		BonusSpellHitRating:  float64(shaman.Talents.ElementalPrecision) * core.SpellHitRatingPerHitChance,
-		BonusSpellCritRating: 0,
-		BonusSpellPower:      0,
-		DamageMultiplier:     1 * (1 + 0.01*float64(shaman.Talents.Concussion)) * (1.0 + 0.02*float64(shaman.Talents.CallOfFlame)),
-		ThreatMultiplier:     1 - (0.1/3)*float64(shaman.Talents.ElementalPrecision),
-		BaseDamage:           core.BaseDamageConfigMagic(1192+bonusBase, 1518+bonusBase, 0.5714+(0.05*float64(shaman.Talents.Shamanism)+bonusCoeff)),
-		OutcomeApplier: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect, attackTable *core.AttackTable) {
-			if spellEffect.MagicHitCheck(sim, spell, attackTable) {
-				if shaman.FlameShockDot.IsActive() || spellEffect.MagicCritCheck(sim, spell, attackTable) {
-					spellEffect.Outcome = core.OutcomeCrit
-					spell.SpellMetrics[spellEffect.Target.UnitIndex].Crits++
-					spellEffect.Damage *= critMultiplier
-				} else {
-					spellEffect.Outcome = core.OutcomeHit
-					spell.SpellMetrics[spellEffect.Target.UnitIndex].Hits++
-				}
-			} else {
-				spellEffect.Outcome = core.OutcomeMiss
-				spell.SpellMetrics[spellEffect.Target.UnitIndex].Misses++
-				spellEffect.Damage = 0
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := dmgBonus + sim.Roll(1192, 1518) + spellCoeff*spell.SpellPower()
+			result := spell.CalcDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCrit)
+			if applyDot && result.Landed() {
+				lvbdotDmg = result.Damage * 0.1 // TODO: does this dot pool with the previous dot?
+				lvbDot.Apply(sim)               // will resnapshot dmg
 			}
+			spell.DealDamage(sim, &result)
 		},
-	}
-
-	if shaman.HasSetBonus(ItemSetThrallsRegalia, 4) || shaman.HasSetBonus(ItemSetNobundosRegalia, 4) {
-		lvbdotDmg := 0.0 // dynamically changing dmg
-		spell := shaman.RegisterSpell(core.SpellConfig{
-			Flags:    core.SpellFlagIgnoreModifiers,
-			ActionID: core.ActionID{SpellID: 71824},
-		})
-		lvbdot := core.NewDot(core.Dot{
-			Spell: spell,
-			Aura: shaman.CurrentTarget.RegisterAura(core.Aura{
-				Label:    "LavaBursted-" + strconv.Itoa(int(shaman.Index)),
-				ActionID: core.ActionID{SpellID: 71824},
-			}),
-			TickLength:    time.Second * 2,
-			NumberOfTicks: 3,
-			TickEffects: core.TickFuncSnapshot(shaman.CurrentTarget, core.SpellEffect{
-				DamageMultiplier: 1,
-				ThreatMultiplier: 1,
-				BaseDamage: core.BaseDamageConfig{
-					Calculator: func(_ *core.Simulation, _ *core.SpellEffect, _ *core.Spell) float64 {
-						return lvbdotDmg / 3 //spread dot over 3 ticks
-					},
-				},
-				IsPeriodic:     true,
-				ProcMask:       core.ProcMaskEmpty,
-				OutcomeApplier: shaman.OutcomeFuncTick(),
-			}),
-		})
-
-		effect.OnSpellHitDealt = func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.Landed() {
-				return
-			}
-			lvbdotDmg = spellEffect.Damage * 0.1 // TODO: does this dot pool with the previous dot?
-			lvbdot.Apply(sim)                    // will resnapshot dmg
-		}
-	}
-
-	spellConfig.ApplyEffects = core.ApplyEffectFuncDirectDamage(effect)
-	return shaman.RegisterSpell(spellConfig)
+	})
 }

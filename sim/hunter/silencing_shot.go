@@ -14,10 +14,10 @@ func (hunter *Hunter) registerSilencingShotSpell() {
 	baseCost := 0.06 * hunter.BaseMana
 
 	hunter.SilencingShot = hunter.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 34490},
-		SpellSchool: core.SpellSchoolPhysical,
-		Flags:       core.SpellFlagMeleeMetrics,
-
+		ActionID:     core.ActionID{SpellID: 34490},
+		SpellSchool:  core.SpellSchoolPhysical,
+		ProcMask:     core.ProcMaskRangedSpecial,
+		Flags:        core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -32,27 +32,28 @@ func (hunter *Hunter) registerSilencingShotSpell() {
 			},
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask: core.ProcMaskRangedSpecial,
-			DamageMultiplier: 0.5 *
-				hunter.markedForDeathMultiplier(),
-			ThreatMultiplier: 1,
+		DamageMultiplier: 0.5 *
+			hunter.markedForDeathMultiplier(),
+		CritMultiplier:   hunter.critMultiplier(true, false, hunter.CurrentTarget),
+		ThreatMultiplier: 1,
 
-			BaseDamage:     core.BaseDamageConfigRangedWeapon(hunter.AmmoDamageBonus),
-			OutcomeApplier: hunter.OutcomeFuncRangedHitAndCrit(hunter.critMultiplier(true, false, hunter.CurrentTarget)),
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			baseDamage := hunter.RangedWeaponDamage(sim, spell.RangedAttackPower(target)) +
+				hunter.AmmoDamageBonus +
+				spell.BonusWeaponDamage()
+
+			spell.CalcAndDealDamageRangedHitAndCrit(sim, target, baseDamage)
 
 			// Add a check for later so we use ASAP when it comes off CD.
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				core.StartDelayedAction(sim, core.DelayedActionOptions{
-					DoAt: sim.CurrentTime + hunter.SilencingShot.CD.Duration,
-					OnAction: func(sim *core.Simulation) {
-						// Need to check in case Readiness caused a shift in timing.
-						if hunter.SilencingShot.IsReady(sim) {
-							hunter.SilencingShot.Cast(sim, hunter.CurrentTarget)
-						}
-					},
-				})
-			},
-		}),
+			core.StartDelayedAction(sim, core.DelayedActionOptions{
+				DoAt: sim.CurrentTime + hunter.SilencingShot.CD.Duration,
+				OnAction: func(sim *core.Simulation) {
+					// Need to check in case Readiness caused a shift in timing.
+					if hunter.SilencingShot.IsReady(sim) {
+						hunter.SilencingShot.Cast(sim, hunter.CurrentTarget)
+					}
+				},
+			})
+		},
 	})
 }

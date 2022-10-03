@@ -11,9 +11,9 @@ func (hunter *Hunter) registerScorpidStingSpell() {
 	baseCost := 0.09 * hunter.BaseMana
 
 	hunter.ScorpidSting = hunter.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 3043},
-		SpellSchool: core.SpellSchoolNature,
-
+		ActionID:     core.ActionID{SpellID: 3043},
+		SpellSchool:  core.SpellSchoolNature,
+		ProcMask:     core.ProcMaskRangedSpecial,
 		ResourceType: stats.Mana,
 		BaseCost:     baseCost,
 
@@ -25,15 +25,14 @@ func (hunter *Hunter) registerScorpidStingSpell() {
 			IgnoreHaste: true, // Hunter GCD is locked at 1.5s
 		},
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:         core.ProcMaskRangedSpecial,
-			ThreatMultiplier: 1,
-			OutcomeApplier:   hunter.OutcomeFuncRangedHit(),
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() {
-					hunter.ScorpidStingAura.Activate(sim)
-				}
-			},
-		}),
+		ThreatMultiplier: 1,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			result := spell.CalcOutcome(sim, target, spell.OutcomeRangedHit)
+			if result.Landed() {
+				hunter.ScorpidStingAura.Activate(sim)
+			}
+			spell.DealOutcome(sim, &result)
+		},
 	})
 }

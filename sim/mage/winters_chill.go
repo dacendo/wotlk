@@ -10,30 +10,31 @@ func (mage *Mage) registerWintersChillSpell() {
 		return
 	}
 
-	wcAura := mage.CurrentTarget.GetAura(core.WintersChillAuraLabel)
-	if wcAura == nil {
-		wcAura = core.WintersChillAura(mage.CurrentTarget, 0)
+	wcAuras := make([]*core.Aura, mage.Env.GetNumTargets())
+	for _, target := range mage.Env.Encounter.Targets {
+		wcAuras[target.Index] = core.WintersChillAura(&target.Unit, 0)
 	}
 
 	mage.WintersChill = mage.RegisterSpell(core.SpellConfig{
 		ActionID:    core.ActionID{SpellID: 28595},
 		SpellSchool: core.SpellSchoolFrost,
+		ProcMask:    core.ProcMaskEmpty,
 		Flags:       SpellFlagMage,
 
-		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
-			ProcMask:            core.ProcMaskEmpty,
-			BonusSpellHitRating: 0,
-			ThreatMultiplier:    1,
-			OutcomeApplier:      mage.OutcomeFuncMagicHit(),
-			OnSpellHitDealt: func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-				if spellEffect.Landed() {
-					wcAura.Activate(sim)
-					if wcAura.IsActive() {
-						wcAura.AddStack(sim)
-					}
+		ThreatMultiplier: 1,
+
+		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+			result := spell.CalcDamage(sim, target, 0, spell.OutcomeMagicHit)
+			spell.DealDamage(sim, &result)
+
+			if result.Landed() {
+				aura := wcAuras[target.Index]
+				aura.Activate(sim)
+				if aura.IsActive() {
+					aura.AddStack(sim)
 				}
-			},
-		}),
+			}
+		},
 	})
 }
 
