@@ -227,13 +227,6 @@ type AttackTable struct {
 	PartialResistNatureThresholds Thresholds
 	PartialResistShadowThresholds Thresholds
 
-	BinaryArcaneHitChance float64
-	BinaryHolyHitChance   float64
-	BinaryFireHitChance   float64
-	BinaryFrostHitChance  float64
-	BinaryNatureHitChance float64
-	BinaryShadowHitChance float64
-
 	DamageDealtMultiplier               float64
 	NatureDamageDealtMultiplier         float64
 	PeriodicShadowDamageDealtMultiplier float64
@@ -268,7 +261,7 @@ func NewAttackTable(attacker *Unit, defender *Unit) *AttackTable {
 		table.BaseMissChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
 		table.BaseBlockChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
 		table.BaseDodgeChance = UnitLevelFloat64(attacker.Level, 0, -0.002, -0.004, -0.006)
-		table.BaseParryChance = UnitLevelFloat64(attacker.Level, 0.05, 0.048, 0.046, 0.044)
+		table.BaseParryChance = UnitLevelFloat64(attacker.Level, 0, -0.002, -0.004, -0.006)
 	}
 
 	table.UpdatePartialResists()
